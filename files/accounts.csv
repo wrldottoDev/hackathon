@@ -1,0 +1,64 @@
+code,name,country,label
+ACC-0001,Alvaro Narváez León,MX,normal
+ACC-0002,Perla Espartaco Mercado,MX,normal
+ACC-0003,Noelia Humberto Rangel,CR,normal
+ACC-0004,Teresa Fabiola Aparicio,PA,normal
+ACC-0005,Marcos Jorge Ojeda,CR,normal
+ACC-0006,Eduardo Rivas,CR,normal
+ACC-0007,Beatriz Borrego Rico,CR,normal
+ACC-0008,Amalia Arcelia Casares,CR,normal
+ACC-0009,Abelardo Aragón Vargas,US,normal
+ACC-0010,Micaela Mayorga,CR,normal
+ACC-0011,Fabiola Negrete Badillo,CR,normal
+ACC-0012,Lic. Cristina Ramírez,CO,normal
+ACC-0013,Carolina Suárez,MX,normal
+ACC-0014,Alejandra Zedillo,PA,normal
+ACC-0015,Dulce Alcala,CO,normal
+ACC-0016,Lic. Silvia Bravo,CO,normal
+ACC-0017,María Elena Flórez Gaitán,PA,normal
+ACC-0018,Eugenia Jacobo Reyna Escobedo,CR,normal
+ACC-0019,Eduardo Jos Beltrán,PA,normal
+ACC-0020,Adán Patiño Holguín,MX,normal
+ACC-0021,Serafín Arturo Armendáriz,CR,normal
+ACC-0022,Dulce Naranjo,MX,normal
+ACC-0023,Josefina Serrato Ríos,CO,normal
+ACC-0024,Patricio Elizondo,PA,normal
+ACC-0025,Carla Ledesma,PA,normal
+HUB-0026,Cristina Cotto Solorzano,CR,smurfing
+HUB-0027,Zeferino Antonio Terrazas Villareal,CR,smurfing
+HUB-0028,Lic. Ilse Corral,CR,smurfing
+LAY-0029,José Eduardo Mariana Villagómez Dávila,CO,layering
+LAY-0030,Lic. Esparta Oquendo,PA,layering
+LAY-0031,Ing. Luz Vigil,CO,layering
+LAY-0032,Cynthia Adame,CR,layering
+LAY-0033,Noelia Bravo,CR,layering
+LAY-0034,Diego Estela Granado Garrido,CO,layering
+LAY-0035,Itzel Cabrera,CR,layering
+LAY-0036,Karla Palomino,MX,layering
+LAY-0037,Isabel Solorio Caldera,CR,layering
+LAY-0038,Octavio Miranda,CO,layering
+LAY-0039,Sr(a). Ricardo Carrillo,US,layering
+EMP-0040,Nancy Rodrigo Vanegas,CR,nomina
+EMP-0041,Esparta Martha Castañeda Adame,CR,nomina
+FAN-0042,Martha Jimínez Rael,US,nomina
+FAN-0043,Ing. Raúl Villalpando,US,nomina
+FAN-0044,Cristobal Limón,CR,nomina
+FAN-0045,Ing. René Pedroza,CR,nomina
+FAN-0046,Luz Cabán Barragán,PA,nomina
+FAN-0047,Andrés Reynoso de Anda,CR,nomina
+FAN-0048,Dr. Nadia Pérez,CO,nomina
+FAN-0049,Violeta Rosado Roque,CR,nomina
+FAN-0050,Sr(a). Flavio Gallardo,MX,nomina
+FAN-0051,Fabiola Villarreal Oquendo,US,nomina
+FAN-0052,Jorge Armando Barrios,CR,nomina
+FAN-0053,Abraham Isabela Lozada Aparicio,MX,nomina
+FAN-0054,Salvador Antonio Acevedo Zaragoza,CO,nomina
+FAN-0055,Aida Eugenio Chacón,MX,nomina
+FAN-0056,Caridad José María Sarabia Martínez,CO,nomina
+CSH-0057,Roberto Guzmán Sisneros,US,cash
+CSH-0058,Mario Luis Manuel Alcaraz Franco,MX,cash
+CSH-0059,Mateo Valdez Valencia,PA,cash
+NOC-0060,Claudio Guillermo Posada Raya,CR,nocturna
+NOC-0061,Aida Maximiliano Gil,CR,nocturna
+NOC-0062,Débora Mata,MX,nocturna
+NOC-0063,Isabel Toro Carvajal,CR,nocturna
