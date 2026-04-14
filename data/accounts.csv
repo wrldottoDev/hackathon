@@ -1,0 +1,64 @@
+code,name,country,label
+ACC-0001,Silvano Ozuna Ramírez,MX,normal
+ACC-0002,Lilia Juana Matías Montes,MX,normal
+ACC-0003,Pedro Hernádez Tirado,CR,normal
+ACC-0004,Lic. Diego Quesada,PA,normal
+ACC-0005,Rosalia Aurora Barela,CR,normal
+ACC-0006,Ing. Gabriela Fierro,CR,normal
+ACC-0007,Vicente Ávalos Villalobos,CR,normal
+ACC-0008,Marisela Julia Chapa Arriaga,CR,normal
+ACC-0009,Itzel Carranza,US,normal
+ACC-0010,Antonio José Eduardo Escalante Lara,CR,normal
+ACC-0011,Noemí Murillo Partida,CR,normal
+ACC-0012,Maximiliano Aguirre Acuña,CO,normal
+ACC-0013,Claudia Daniela Velázquez Girón,MX,normal
+ACC-0014,Sofía Karina Quintero,PA,normal
+ACC-0015,Leticia Yeni Enríquez,CO,normal
+ACC-0016,Alfonso Zarate Barragán,CO,normal
+ACC-0017,Jaime Curiel,PA,normal
+ACC-0018,Israel Valadez,CR,normal
+ACC-0019,Lic. José Luis Saldaña,PA,normal
+ACC-0020,Jesús Víctor Garibay,MX,normal
+ACC-0021,Pedro Zamudio Irizarry,CR,normal
+ACC-0022,Ángel Hernán Canales Collado,MX,normal
+ACC-0023,Margarita Mercedes Lucio,CO,normal
+ACC-0024,Mitzy Lara Arguello,PA,normal
+ACC-0025,Guadalupe Alejandra Ordóñez Esquivel,PA,normal
+HUB-0026,Lic. María Cristina Mata,CR,smurfing
+HUB-0027,Lic. Minerva Chávez,CR,smurfing
+HUB-0028,Lic. Rafaél Mata,CR,smurfing
+LAY-0029,Ana Cecilia Farías Botello,CO,layering
+LAY-0030,Ramiro Pascual Camacho,PA,layering
+LAY-0031,Evelio Juan Carlos Serna Tejada,CO,layering
+LAY-0032,Lic. Germán Solorio,CR,layering
+LAY-0033,Bruno Esquivel,CR,layering
+LAY-0034,Fernando Cristobal Carmona,CO,layering
+LAY-0035,Samuel Amador,CR,layering
+LAY-0036,Dr. Bruno Montez,MX,layering
+LAY-0037,Lorena Soledad Vaca Negrete,CR,layering
+LAY-0038,Nelly Pichardo Fernández,CO,layering
+LAY-0039,José María Octavio Aragón Figueroa,US,layering
+EMP-0040,Diego Alvaro Méndez,CR,nomina
+EMP-0041,Cristina Padilla,CR,nomina
+FAN-0042,Leonardo Bernardo Benavídez,US,nomina
+FAN-0043,Lic. Carlos Jaimes,US,nomina
+FAN-0044,Cynthia Lozada Arteaga,CR,nomina
+FAN-0045,Teresa Espinosa,CR,nomina
+FAN-0046,Agustín Peralta,PA,nomina
+FAN-0047,Cecilia Elvira Niño,CR,nomina
+FAN-0048,Lorena Trinidad Lucero Leyva,CO,nomina
+FAN-0049,Rodolfo Eloy Guerrero,CR,nomina
+FAN-0050,Gustavo Vicente Quiñones,MX,nomina
+FAN-0051,Estela Adela Espinosa,US,nomina
+FAN-0052,Paola Sarabia Carreón,CR,nomina
+FAN-0053,Sra. María José Gutiérrez,MX,nomina
+FAN-0054,Eric Galarza Cotto,CO,nomina
+FAN-0055,Rolando Sisneros Salcedo,MX,nomina
+FAN-0056,Virginia Soledad Rivas Perales,CO,nomina
+CSH-0057,Araceli Cynthia Ojeda Ceja,US,cash
+CSH-0058,Mauricio Ramírez,MX,cash
+CSH-0059,Frida Gracia,PA,cash
+NOC-0060,Miguel Paz,CR,nocturna
+NOC-0061,Salvador José Emilio Carrión,CR,nocturna
+NOC-0062,Dr. Eugenio Galarza,MX,nocturna
+NOC-0063,Lic. Frida Jaime,CR,nocturna
