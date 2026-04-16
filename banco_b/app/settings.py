@@ -7,6 +7,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_BANK_REGISTRY = {
     "BKA": "http://127.0.0.1:8001",
     "BKB": "http://127.0.0.1:8002",
+    "BKC": "http://127.0.0.1:8004",
 }
 
 
