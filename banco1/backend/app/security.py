@@ -4,8 +4,8 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from passlib.context import CryptContext
 
+from .settings import SECRET_KEY
 
-SECRET_KEY = os.getenv("BANCO1_SECRET_KEY", "banco1-dev-secret-key-change-me-2026")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 12
 

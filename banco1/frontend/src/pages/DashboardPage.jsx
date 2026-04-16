@@ -6,24 +6,18 @@ export default function DashboardPage() {
   const { token, user } = useAuth();
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
-  const [summary, setSummary] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
 
-    Promise.all([
-      apiRequest("/accounts/my", { token }),
-      apiRequest("/transactions/my", { token }),
-      apiRequest("/risk/summary", { token }),
-    ])
-      .then(([accountData, transactionData, summaryData]) => {
+    Promise.all([apiRequest("/accounts/my", { token }), apiRequest("/transactions/my", { token })])
+      .then(([accountData, transactionData]) => {
         if (!active) {
           return;
         }
         setAccounts(accountData);
         setTransactions(transactionData);
-        setSummary(summaryData);
       })
       .catch((loadError) => {
         if (active) {
@@ -37,6 +31,13 @@ export default function DashboardPage() {
   }, [token]);
 
   const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
+  const accountIds = new Set(accounts.map((account) => account.id));
+  const sentTransactions = transactions.filter((transaction) => accountIds.has(transaction.source_account_id));
+  const receivedTransactions = transactions.filter((transaction) =>
+    accountIds.has(transaction.destination_account_id),
+  );
+  const totalSent = sentTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+  const totalReceived = receivedTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
 
   return (
     <section className="page">
@@ -46,7 +47,7 @@ export default function DashboardPage() {
           <h2>Vista general de {user?.full_name}</h2>
         </div>
         <p className="page-copy">
-          Monitorea saldos, actividad reciente y señales de riesgo sobre la base cargada.
+          Revisa tus cuentas, tus saldos y la actividad reciente de tus movimientos.
         </p>
       </header>
 
@@ -62,12 +63,12 @@ export default function DashboardPage() {
           <strong>{accounts.length}</strong>
         </article>
         <article className="metric-card">
-          <span>Movimientos visibles</span>
-          <strong>{transactions.length}</strong>
+          <span>Transferencias enviadas</span>
+          <strong>{sentTransactions.length}</strong>
         </article>
         <article className="metric-card">
-          <span>Alertas high</span>
-          <strong>{summary?.high ?? 0}</strong>
+          <span>Transferencias recibidas</span>
+          <strong>{receivedTransactions.length}</strong>
         </article>
       </div>
 
@@ -98,35 +99,26 @@ export default function DashboardPage() {
 
         <article className="panel">
           <div className="panel-header">
-            <h3>Resumen de riesgo</h3>
-            <span>{summary?.total_alerts ?? 0} alertas</span>
+            <h3>Resumen de actividad</h3>
+            <span>{transactions.length} movimientos</span>
           </div>
-          {summary ? (
-            <div className="summary-grid">
-              <div>
-                <small>Low</small>
-                <strong>{summary.low}</strong>
-              </div>
-              <div>
-                <small>Medium</small>
-                <strong>{summary.medium}</strong>
-              </div>
-              <div>
-                <small>High</small>
-                <strong>{summary.high}</strong>
-              </div>
+          <div className="summary-grid">
+            <div>
+              <small>Total enviado</small>
+              <strong>{formatCurrency(totalSent)}</strong>
             </div>
-          ) : (
-            <p className="empty-state">Sin datos aún.</p>
-          )}
-          <div className="alert-preview-list">
-            {summary?.latest_alerts?.slice(0, 3).map((alert) => (
-              <div className="alert-preview" key={alert.id}>
-                <span className={`risk-pill ${alert.level}`}>{alert.level}</span>
-                <p>{alert.reason}</p>
-              </div>
-            ))}
+            <div>
+              <small>Total recibido</small>
+              <strong>{formatCurrency(totalReceived)}</strong>
+            </div>
+            <div>
+              <small>Último movimiento</small>
+              <strong>{transactions[0] ? formatDate(transactions[0].created_at) : "Sin datos"}</strong>
+            </div>
           </div>
+          <p className="empty-state bank-note">
+            El monitoreo de alertas y análisis de red se consulta desde una consola externa separada.
+          </p>
         </article>
       </div>
 

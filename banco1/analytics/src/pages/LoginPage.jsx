@@ -1,15 +1,14 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../auth";
-import { BANK_NAME } from "../config";
+import { useNavigate } from "react-router-dom";
+import { useAnalysisAuth } from "../auth";
 
-export default function RegisterPage() {
-  const { register } = useAuth();
+export default function LoginPage() {
+  const { banks, login, selectedBank } = useAnalysisAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    full_name: "",
-    email: "",
-    password: "",
+    bankId: selectedBank.id,
+    email: "demo@example.com",
+    password: "demo1234",
   });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -20,7 +19,7 @@ export default function RegisterPage() {
     setError("");
 
     try {
-      await register(form);
+      await login(form);
       navigate("/");
     } catch (submitError) {
       setError(submitError.message);
@@ -30,24 +29,29 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="auth-shell">
-      <div className="auth-card">
-        <p className="eyebrow">Nueva cuenta</p>
-        <h1>Activa tu perfil en {BANK_NAME}</h1>
-        <p className="auth-copy">
-          Crea un usuario, abre una cuenta simulada y empieza a mover dinero entre cuentas dentro de {BANK_NAME}.
+    <div className="analysis-auth-shell">
+      <div className="analysis-auth-card">
+        <p className="analysis-kicker">Cross-Bank Monitoring</p>
+        <h1>Consola externa de análisis</h1>
+        <p className="analysis-copy">
+          Ingresa a un banco específico para revisar alertas, transacciones sospechosas y su red.
         </p>
 
         <form className="stack-form" onSubmit={handleSubmit}>
           <label>
-            Nombre completo
-            <input
-              type="text"
-              value={form.full_name}
-              onChange={(event) => setForm({ ...form, full_name: event.target.value })}
-              required
-            />
+            Banco
+            <select
+              value={form.bankId}
+              onChange={(event) => setForm({ ...form, bankId: event.target.value })}
+            >
+              {banks.map((bank) => (
+                <option key={bank.id} value={bank.id}>
+                  {bank.label}
+                </option>
+              ))}
+            </select>
           </label>
+
           <label>
             Email
             <input
@@ -57,6 +61,7 @@ export default function RegisterPage() {
               required
             />
           </label>
+
           <label>
             Password
             <input
@@ -64,18 +69,14 @@ export default function RegisterPage() {
               value={form.password}
               onChange={(event) => setForm({ ...form, password: event.target.value })}
               required
-              minLength={6}
             />
           </label>
+
           {error ? <p className="form-error">{error}</p> : null}
-          <button className="primary-button" type="submit" disabled={submitting}>
-            {submitting ? "Creando..." : "Crear usuario"}
+          <button type="submit" className="primary-button" disabled={submitting}>
+            {submitting ? "Ingresando..." : "Entrar a la consola"}
           </button>
         </form>
-
-        <p className="auth-footer">
-          ¿Ya tienes usuario? <Link to="/login">Ir al login</Link>
-        </p>
       </div>
     </div>
   );

@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
 import { Background, Controls, MiniMap, ReactFlow } from "@xyflow/react";
-import { apiRequest, formatCurrency, formatDate } from "../api";
-import { useAuth } from "../auth";
+import { bankRequest, formatCurrency, formatDate } from "../api";
+import { useAnalysisAuth } from "../auth";
 
 const RISK_OPTIONS = ["all", "low", "medium", "high"];
 
 function riskColor(risk) {
   if (risk === "high") {
-    return "#b42318";
+    return "#ff6b6b";
   }
   if (risk === "medium") {
-    return "#c87617";
+    return "#f4b740";
   }
-  return "#117864";
+  return "#29c3a5";
 }
 
 function riskLabel(risk) {
@@ -36,9 +36,8 @@ function buildQuery(params) {
 function buildFlow(graph) {
   const focusNodes = graph.nodes.filter((node) => node.is_focus);
   const contextNodes = graph.nodes.filter((node) => !node.is_focus);
-  const centerX = 560;
-  const centerY = 320;
-
+  const centerX = 620;
+  const centerY = 350;
   const nodes = [];
 
   if (focusNodes.length) {
@@ -47,26 +46,25 @@ function buildFlow(graph) {
         id: node.id,
         position: {
           x: 260,
-          y: centerY - 110 + index * 150,
+          y: centerY - 100 + index * 145,
         },
         data: {
           label: `${node.owner_name} · ${node.account_number} · ${formatCurrency(node.balance)}`,
         },
         style: {
-          background: "#dff2ec",
+          background: "#102c31",
           border: `3px solid ${riskColor(node.risk)}`,
-          borderRadius: "20px",
-          color: "#1f2421",
-          width: 260,
+          borderRadius: "22px",
+          color: "#f7fbfc",
+          width: 270,
           padding: "16px",
           fontSize: "12px",
           fontWeight: 600,
-          boxShadow: "0 24px 54px rgba(17, 120, 100, 0.18)",
         },
       });
     });
 
-    const radius = Math.max(190, contextNodes.length * 18);
+    const radius = Math.max(220, contextNodes.length * 18);
     contextNodes.forEach((node, index) => {
       const angle = (Math.PI * 2 * index) / Math.max(contextNodes.length, 1);
       nodes.push({
@@ -79,20 +77,19 @@ function buildFlow(graph) {
           label: `${node.owner_name} · ${node.account_number.slice(-4)} · ${formatCurrency(node.balance)}`,
         },
         style: {
-          background: "#fffaf3",
+          background: "#102126",
           border: `2px solid ${riskColor(node.risk)}`,
           borderRadius: "18px",
-          color: "#1f2421",
+          color: "#f7fbfc",
           width: 220,
           padding: "14px",
           fontSize: "12px",
-          boxShadow: "0 20px 40px rgba(16, 20, 18, 0.08)",
         },
       });
     });
   } else {
     const total = Math.max(graph.nodes.length, 1);
-    const radius = Math.max(240, total * 14);
+    const radius = Math.max(260, total * 14);
     graph.nodes.forEach((node, index) => {
       const angle = (Math.PI * 2 * index) / total;
       nodes.push({
@@ -105,14 +102,13 @@ function buildFlow(graph) {
           label: `${node.owner_name} · ${node.account_number.slice(-4)} · ${formatCurrency(node.balance)}`,
         },
         style: {
-          background: "#fffaf3",
+          background: "#102126",
           border: `2px solid ${riskColor(node.risk)}`,
           borderRadius: "18px",
-          color: "#1f2421",
+          color: "#f7fbfc",
           width: 220,
           padding: "14px",
           fontSize: "12px",
-          boxShadow: "0 20px 40px rgba(16, 20, 18, 0.08)",
         },
       });
     });
@@ -129,7 +125,7 @@ function buildFlow(graph) {
       strokeWidth: edge.risk === "high" ? 3.4 : edge.risk === "medium" ? 2.6 : 1.8,
     },
     labelStyle: {
-      fill: "#4d514c",
+      fill: "#8ea5a8",
       fontSize: 11,
       fontWeight: 600,
     },
@@ -138,9 +134,9 @@ function buildFlow(graph) {
   return { nodes, edges };
 }
 
-function downloadReport(report) {
+function downloadReport(report, bankLabel) {
   const lines = [
-    "Banco 1 - Reporte de Red Transaccional",
+    `${bankLabel} - Reporte de Red Transaccional`,
     `Generado: ${formatDate(report.generated_at)}`,
     `Cliente: ${report.user.full_name} <${report.user.email}>`,
     `Filtro de riesgo: ${riskLabel(report.risk_filter)}`,
@@ -169,7 +165,7 @@ function downloadReport(report) {
   const url = window.URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `banco1-reporte-red-${report.user.id}-${report.risk_filter}.txt`;
+  anchor.download = `analysis-report-${report.user.id}-${report.risk_filter}.txt`;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
@@ -177,7 +173,7 @@ function downloadReport(report) {
 }
 
 export default function NetworkPage() {
-  const { token } = useAuth();
+  const { token, selectedBank } = useAnalysisAuth();
   const [users, setUsers] = useState([]);
   const [riskFilter, setRiskFilter] = useState("all");
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -188,10 +184,10 @@ export default function NetworkPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    apiRequest("/users", { token })
+    bankRequest(selectedBank.apiUrl, "/users", { token })
       .then((payload) => setUsers(payload))
       .catch((loadError) => setError(loadError.message));
-  }, [token]);
+  }, [selectedBank.apiUrl, token]);
 
   useEffect(() => {
     const query = buildQuery({
@@ -202,11 +198,11 @@ export default function NetworkPage() {
     setGraphLoading(true);
     setError("");
 
-    apiRequest(`/network/graph${query}`, { token })
+    bankRequest(selectedBank.apiUrl, `/network/graph${query}`, { token })
       .then((payload) => setGraph(buildFlow(payload)))
       .catch((loadError) => setError(loadError.message))
       .finally(() => setGraphLoading(false));
-  }, [riskFilter, selectedUserId, token]);
+  }, [riskFilter, selectedBank.apiUrl, selectedUserId, token]);
 
   useEffect(() => {
     if (!selectedUserId) {
@@ -220,11 +216,11 @@ export default function NetworkPage() {
     });
 
     setReportLoading(true);
-    apiRequest(`/network/report${query}`, { token })
+    bankRequest(selectedBank.apiUrl, `/network/report${query}`, { token })
       .then((payload) => setReport(payload))
       .catch((loadError) => setError(loadError.message))
       .finally(() => setReportLoading(false));
-  }, [riskFilter, selectedUserId, token]);
+  }, [riskFilter, selectedBank.apiUrl, selectedUserId, token]);
 
   const selectedUser = users.find((user) => String(user.id) === String(selectedUserId));
 
@@ -233,10 +229,10 @@ export default function NetworkPage() {
       <header className="page-header">
         <div>
           <p className="eyebrow">Red</p>
-          <h2>Mapa de transacciones</h2>
+          <h2>Mapa de {selectedBank.label}</h2>
         </div>
         <p className="page-copy">
-          Filtra por riesgo, enfoca un cliente específico y genera un reporte descargable desde la misma vista.
+          Selecciona riesgo o cliente para aislar una subred y generar un reporte exportable.
         </p>
       </header>
 
@@ -244,8 +240,8 @@ export default function NetworkPage() {
 
       <article className="panel">
         <div className="panel-header">
-          <h3>Filtros de análisis</h3>
-          <span>{selectedUser ? selectedUser.full_name : "Toda la red"}</span>
+          <h3>Filtros</h3>
+          <span>{selectedUser ? selectedUser.full_name : selectedBank.label}</span>
         </div>
 
         <div className="network-toolbar">
@@ -280,13 +276,13 @@ export default function NetworkPage() {
 
             <button
               type="button"
-              className="ghost-button light"
+              className="secondary-button"
               onClick={() => {
                 setSelectedUserId("");
                 setRiskFilter("all");
               }}
             >
-              Limpiar filtros
+              Limpiar
             </button>
           </div>
         </div>
@@ -323,7 +319,7 @@ export default function NetworkPage() {
           <span><i className="legend-dot high" /> High</span>
         </div>
 
-        <div className="graph-canvas">
+        <div className="graph-canvas dark">
           <ReactFlow nodes={graph.nodes} edges={graph.edges} fitView>
             <MiniMap />
             <Controls />
@@ -332,17 +328,15 @@ export default function NetworkPage() {
         </div>
       </article>
 
-      <div className="two-column-grid network-report-grid">
+      <div className="two-column-grid">
         <article className="panel">
           <div className="panel-header">
             <h3>Reporte de cliente</h3>
-            <span>{selectedUser ? "Listo para exportar" : "Selecciona un cliente"}</span>
+            <span>{selectedUser ? "Exportable" : "Selecciona un cliente"}</span>
           </div>
 
           {!selectedUserId ? (
-            <p className="empty-state">
-              Selecciona un cliente para ver sus transacciones en la red y generar un reporte.
-            </p>
+            <p className="empty-state">Selecciona un cliente para generar su reporte.</p>
           ) : reportLoading ? (
             <p className="empty-state">Generando reporte...</p>
           ) : report ? (
@@ -353,16 +347,16 @@ export default function NetworkPage() {
                   <strong>{report.total_transactions}</strong>
                 </div>
                 <div className="compact-metric">
+                  <small>Con alerta</small>
+                  <strong>{report.flagged_transactions}</strong>
+                </div>
+                <div className="compact-metric">
                   <small>Enviado</small>
                   <strong>{formatCurrency(report.total_sent)}</strong>
                 </div>
                 <div className="compact-metric">
                   <small>Recibido</small>
                   <strong>{formatCurrency(report.total_received)}</strong>
-                </div>
-                <div className="compact-metric">
-                  <small>Con alerta</small>
-                  <strong>{report.flagged_transactions}</strong>
                 </div>
               </div>
 
@@ -378,7 +372,7 @@ export default function NetworkPage() {
               <button
                 type="button"
                 className="primary-button"
-                onClick={() => downloadReport(report)}
+                onClick={() => downloadReport(report, selectedBank.label)}
               >
                 Descargar reporte
               </button>
@@ -393,7 +387,6 @@ export default function NetworkPage() {
             <h3>Contrapartes frecuentes</h3>
             <span>{report?.top_counterparties?.length ?? 0} resultados</span>
           </div>
-
           {report?.top_counterparties?.length ? (
             <div className="detail-list">
               {report.top_counterparties.map((counterparty) => (
@@ -420,9 +413,8 @@ export default function NetworkPage() {
       <article className="panel">
         <div className="panel-header">
           <h3>Transacciones del cliente</h3>
-          <span>{report?.recent_transactions?.length ?? 0} registros recientes</span>
+          <span>{report?.recent_transactions?.length ?? 0} registros</span>
         </div>
-
         <div className="table-wrapper">
           <table>
             <thead>

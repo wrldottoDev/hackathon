@@ -47,7 +47,7 @@ export default function AccountsPage() {
           <p className="eyebrow">Cuentas</p>
           <h2>Mis cuentas bancarias</h2>
         </div>
-        <p className="page-copy">Cada cuenta tiene saldo independiente y puede participar en la red de transferencias.</p>
+        <p className="page-copy">Cada cuenta tiene saldo independiente para operar dentro del portal bancario.</p>
       </header>
 
       <div className="two-column-grid">

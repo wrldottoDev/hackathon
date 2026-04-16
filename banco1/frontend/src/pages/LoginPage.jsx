@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
+import { BANK_NAME, DEMO_EMAIL } from "../config";
 
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    email: "demo@example.com",
+    email: DEMO_EMAIL,
     password: "demo1234",
   });
   const [error, setError] = useState("");
@@ -30,10 +31,10 @@ export default function LoginPage() {
   return (
     <div className="auth-shell">
       <div className="auth-card">
-        <p className="eyebrow">Banco 1</p>
+        <p className="eyebrow">{BANK_NAME}</p>
         <h1>Ingreso seguro para la demo</h1>
         <p className="auth-copy">
-          Entra con la cuenta demo o con un usuario nuevo para explorar cuentas, alertas y la red transaccional.
+          Entra con la cuenta demo o con un usuario nuevo para administrar tus cuentas y transferencias en {BANK_NAME}.
         </p>
 
         <form className="stack-form" onSubmit={handleSubmit}>

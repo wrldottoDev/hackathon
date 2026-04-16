@@ -1,11 +1,10 @@
 import { NavLink, Navigate, Outlet, Route, Routes, useNavigate } from "react-router-dom";
 import { useAuth } from "./auth";
+import { BANK_NAME, BANK_TAGLINE } from "./config";
 import AccountsPage from "./pages/AccountsPage";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
-import NetworkPage from "./pages/NetworkPage";
 import RegisterPage from "./pages/RegisterPage";
-import RiskPage from "./pages/RiskPage";
 import TransactionsPage from "./pages/TransactionsPage";
 import TransferPage from "./pages/TransferPage";
 
@@ -13,7 +12,7 @@ function ProtectedRoute() {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return <div className="screen-loader">Cargando Banco 1...</div>;
+    return <div className="screen-loader">Cargando {BANK_NAME}...</div>;
   }
 
   if (!isAuthenticated) {
@@ -45,10 +44,8 @@ function AppShell() {
       <aside className="sidebar">
         <div>
           <p className="sidebar-kicker">Hackathon Demo</p>
-          <h1>Banco 1</h1>
-          <p className="sidebar-text">
-            Simulador bancario con alertas de riesgo y red de transacciones.
-          </p>
+          <h1>{BANK_NAME}</h1>
+          <p className="sidebar-text">{BANK_TAGLINE}</p>
         </div>
 
         <nav className="nav-links">
@@ -56,8 +53,6 @@ function AppShell() {
           <NavLink to="/accounts">Mis cuentas</NavLink>
           <NavLink to="/transfer">Transferir</NavLink>
           <NavLink to="/transactions">Historial</NavLink>
-          <NavLink to="/risk">Alertas</NavLink>
-          <NavLink to="/network">Red</NavLink>
         </nav>
 
         <div className="sidebar-user">
@@ -100,8 +95,6 @@ export default function App() {
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/transfer" element={<TransferPage />} />
         <Route path="/transactions" element={<TransactionsPage />} />
-        <Route path="/risk" element={<RiskPage />} />
-        <Route path="/network" element={<NetworkPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

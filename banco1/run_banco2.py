@@ -3,7 +3,7 @@ import uvicorn
 from bank_instances import configure_bank_environment
 
 
-BANK = configure_bank_environment("banco1")
+BANK = configure_bank_environment("banco2")
 
 
 if __name__ == "__main__":

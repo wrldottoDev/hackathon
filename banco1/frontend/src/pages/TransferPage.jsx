@@ -54,7 +54,7 @@ export default function TransferPage() {
           amount: Number(form.amount),
         },
       });
-      setMessage("Transferencia completada y analizada por el motor de riesgo.");
+      setMessage("Transferencia completada correctamente.");
       await loadAccounts();
     } catch (submitError) {
       setError(submitError.message);
@@ -71,7 +71,7 @@ export default function TransferPage() {
           <h2>Mueve dinero entre cuentas</h2>
         </div>
         <p className="page-copy">
-          Cada transferencia actualiza saldos en tiempo real y dispara evaluación de riesgo.
+          Cada transferencia actualiza los saldos en tiempo real y queda registrada en el historial.
         </p>
       </header>
 

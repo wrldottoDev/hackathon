@@ -4,11 +4,16 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build"
+    "dev": "vite --mode banco1 --host 127.0.0.1 --port 5173",
+    "dev:banco1": "vite --mode banco1 --host 127.0.0.1 --port 5173",
+    "dev:banco2": "vite --mode banco2 --host 127.0.0.1 --port 5175",
+    "dev:banco3": "vite --mode banco3 --host 127.0.0.1 --port 5176",
+    "build": "vite build --mode banco1",
+    "build:banco1": "vite build --mode banco1",
+    "build:banco2": "vite build --mode banco2",
+    "build:banco3": "vite build --mode banco3"
   },
   "dependencies": {
-    "@xyflow/react": "^12.8.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.1"

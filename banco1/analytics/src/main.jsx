@@ -1,19 +1,17 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
+import "@xyflow/react/dist/style.css";
 import App from "./App";
-import { AuthProvider } from "./auth";
-import { BANK_NAME } from "./config";
+import { AnalysisAuthProvider } from "./auth";
 import "./styles.css";
-
-document.title = `${BANK_NAME} | Portal Bancario`;
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
-      <AuthProvider>
+      <AnalysisAuthProvider>
         <App />
-      </AuthProvider>
+      </AnalysisAuthProvider>
     </BrowserRouter>
   </React.StrictMode>,
 );

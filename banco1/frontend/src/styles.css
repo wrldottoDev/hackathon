@@ -353,6 +353,10 @@ select:focus {
   background: rgba(20, 32, 28, 0.04);
 }
 
+.bank-note {
+  margin-top: 16px;
+}
+
 .table-wrapper {
   overflow: auto;
 }

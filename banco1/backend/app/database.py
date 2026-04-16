@@ -1,13 +1,9 @@
-from pathlib import Path
-
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
+from .settings import BACKEND_DIR, DATABASE_PATH, DATABASE_URL
 
-BACKEND_DIR = Path(__file__).resolve().parents[1]
-DATABASE_PATH = BACKEND_DIR / "bank.db"
-DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
 engine = create_engine(
     DATABASE_URL,

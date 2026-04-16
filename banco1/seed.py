@@ -2,6 +2,7 @@ import random
 
 from backend.app import crud, models, schemas
 from backend.app.database import DATABASE_PATH, SessionLocal, init_db
+from backend.app.settings import BANK_NAME
 from backend.app.security import hash_password
 
 
@@ -220,7 +221,7 @@ def print_summary(db):
     alert_count = db.query(models.RiskAlert).count()
     summary = crud.get_risk_summary(db)
 
-    print("Banco 1 seed completado")
+    print(f"{BANK_NAME} seed completado")
     print(f"Base recreada en: {DATABASE_PATH}")
     print(f"Usuarios: {user_count}")
     print(f"Cuentas: {account_count}")

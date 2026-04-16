@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { apiRequest, formatCurrency, formatDate } from "../api";
-import { useAuth } from "../auth";
+import { bankRequest, formatCurrency, formatDate } from "../api";
+import { useAnalysisAuth } from "../auth";
 
-export default function RiskPage() {
-  const { token } = useAuth();
+export default function AlertsPage() {
+  const { token, selectedBank } = useAnalysisAuth();
   const [summary, setSummary] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [error, setError] = useState("");
@@ -12,15 +12,15 @@ export default function RiskPage() {
     let active = true;
 
     Promise.all([
-      apiRequest("/risk/summary", { token }),
-      apiRequest("/risk/alerts", { token }),
+      bankRequest(selectedBank.apiUrl, "/risk/summary", { token }),
+      bankRequest(selectedBank.apiUrl, "/risk/alerts", { token }),
     ])
-      .then(([summaryData, alertData]) => {
+      .then(([summaryPayload, alertsPayload]) => {
         if (!active) {
           return;
         }
-        setSummary(summaryData);
-        setAlerts(alertData);
+        setSummary(summaryPayload);
+        setAlerts(alertsPayload);
       })
       .catch((loadError) => {
         if (active) {
@@ -31,17 +31,17 @@ export default function RiskPage() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [selectedBank.apiUrl, token]);
 
   return (
     <section className="page">
       <header className="page-header">
         <div>
-          <p className="eyebrow">Riesgo</p>
-          <h2>Alertas y scoring</h2>
+          <p className="eyebrow">Alertas</p>
+          <h2>Alertas de {selectedBank.label}</h2>
         </div>
         <p className="page-copy">
-          Reglas simples para demo: monto alto, structuring, repetición y movimiento rápido de fondos.
+          Lista completa de alertas generadas por el motor heurístico del banco seleccionado.
         </p>
       </header>
 
@@ -49,7 +49,7 @@ export default function RiskPage() {
 
       <div className="metric-grid">
         <article className="metric-card">
-          <span>Total alertas</span>
+          <span>Total</span>
           <strong>{summary?.total_alerts ?? 0}</strong>
         </article>
         <article className="metric-card">
@@ -68,8 +68,8 @@ export default function RiskPage() {
 
       <article className="panel">
         <div className="panel-header">
-          <h3>Últimas alertas</h3>
-          <span>Ordenadas por fecha</span>
+          <h3>Listado completo</h3>
+          <span>{alerts.length} alertas</span>
         </div>
         <div className="table-wrapper">
           <table>
@@ -86,9 +86,7 @@ export default function RiskPage() {
             <tbody>
               {alerts.map((alert) => (
                 <tr key={alert.id}>
-                  <td>
-                    <span className={`risk-pill ${alert.level}`}>{alert.level}</span>
-                  </td>
+                  <td><span className={`risk-pill ${alert.level}`}>{alert.level}</span></td>
                   <td>{alert.score}</td>
                   <td>{alert.account_number || alert.account_id || "-"}</td>
                   <td>{alert.transaction_amount ? formatCurrency(alert.transaction_amount) : "-"}</td>
@@ -98,7 +96,7 @@ export default function RiskPage() {
               ))}
             </tbody>
           </table>
-          {!alerts.length ? <p className="empty-state">No se han generado alertas todavía.</p> : null}
+          {!alerts.length ? <p className="empty-state">No hay alertas registradas.</p> : null}
         </div>
       </article>
     </section>

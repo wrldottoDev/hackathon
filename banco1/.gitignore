@@ -2,6 +2,10 @@ __pycache__/
 *.pyc
 .DS_Store
 backend/bank.db
+backend/banco2.db
+backend/banco3.db
 bank.db
 frontend/node_modules/
 frontend/dist/
+analytics/node_modules/
+analytics/dist/

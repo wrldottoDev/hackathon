@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { apiRequest } from "./api";
+import { BANK_ID } from "./config";
 
 const AuthContext = createContext(null);
 
 const STORAGE_KEYS = {
-  token: "banco1.token",
-  user: "banco1.user",
+  token: `${BANK_ID}.token`,
+  user: `${BANK_ID}.user`,
 };
 
 export function AuthProvider({ children }) {
