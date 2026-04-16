@@ -1,0 +1,22 @@
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from ..core.dependencies import require_analytics_api_key
+from ..database import get_db
+from ..schemas.account import AccountFollowUpResponse
+from ..services.follow_up_service import get_account_follow_up
+
+router = APIRouter(
+    prefix="/accounts",
+    tags=["accounts"],
+    dependencies=[Depends(require_analytics_api_key)],
+)
+
+
+@router.get("/{account_number}/follow-up", response_model=AccountFollowUpResponse)
+def follow_up(
+    account_number: str,
+    db: Session = Depends(get_db),
+):
+    return get_account_follow_up(db, account_number)
+
