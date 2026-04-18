@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Column, DateTime, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from ..database import Base
@@ -23,7 +23,7 @@ class ObservedTransaction(Base):
     destination_account_number = Column(String(20), index=True, nullable=False)
     source_bank_code = Column(String(10), nullable=False)
     destination_bank_code = Column(String(10), nullable=False)
-    amount = Column(Float, nullable=False)
+    amount = Column(Numeric(14, 2), nullable=False)
     currency = Column(String(10), nullable=False)
     transaction_type = Column(String(50), nullable=False)
     status = Column(String(20), nullable=False)
@@ -33,11 +33,10 @@ class ObservedTransaction(Base):
     external_reference = Column(String(100), nullable=True)
     failure_reason = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False)
-    fetched_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    fetched_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     risk_alerts = relationship(
         "RiskAlert",
         back_populates="observed_transaction",
         cascade="all, delete-orphan",
     )
-

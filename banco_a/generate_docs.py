@@ -396,7 +396,7 @@ def build(pdf: Doc):
         "    account_number = Column(String(20), unique=True, index=True)  # BKA-XXXXXXXXXX",
         "    user_id        = Column(Integer, ForeignKey('users.id'), index=True)",
         "    bank_code      = Column(String(10), default='BKA')",
-        "    balance        = Column(Float, default=0.0)",
+        "    balance        = Column(Numeric(14, 2), default=Decimal('0.00'))",
         "    currency       = Column(String(10), default='CRC')",
         "    status         = Column(String(20), default='active')  # 'active' | 'inactive'",
         "    created_at     = Column(DateTime, default=datetime.utcnow)",
@@ -418,7 +418,7 @@ def build(pdf: Doc):
         "    destination_account_number = Column(String(20), index=True)",
         "    source_bank_code           = Column(String(10))",
         "    destination_bank_code      = Column(String(10))",
-        "    amount                     = Column(Float)",
+        "    amount                     = Column(Numeric(14, 2))",
         "    currency                   = Column(String(10), default='CRC')",
         "    transaction_type           = Column(String(50), default='internal_transfer')",
         "    status                     = Column(String(20), default='completed')",
@@ -857,7 +857,7 @@ def build(pdf: Doc):
     pdf.ln(8)
     pdf.info_box(
         "Próximas fases de FlowLens",
-        "Fase 2: Transferencias interbancarias entre Banco A, Banco B y Banco C.\n"
+        "Fase 2: Transferencias interbancarias entre bancos conectados a la plataforma.\n"
         "Fase 3: Módulo externo de Analytics con motor de riesgo por reglas, alertas y grafo de red transaccional.\n"
         "Fase 4: Dashboard de analista con seguimiento profundo de cuentas sospechosas.\n"
         "Fase 5: Despliegue en contenedores con Docker Compose.",

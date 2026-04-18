@@ -1,7 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { analyticsRequest, formatDate } from "../api";
 import { useAnalysisAuth } from "../auth";
 import { DEMO_BANKS } from "../banks";
+
+function patternLabel(pattern) {
+  return pattern.replaceAll("_", " ");
+}
 
 export default function OverviewPage() {
   const { apiKey } = useAnalysisAuth();
@@ -69,104 +74,189 @@ export default function OverviewPage() {
     }
   }
 
+  const onlineBanks = banks.filter((bank) => bank.status === "online").length;
+  const errorBanks = banks.filter((bank) => bank.status === "error").length;
+  const topPatterns = useMemo(
+    () =>
+      Object.entries(summary?.by_pattern || {})
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 6),
+    [summary],
+  );
+  const topPattern = topPatterns[0];
+  const latestFetch = useMemo(() => {
+    const timestamps = banks
+      .map((bank) => bank.last_fetched_at)
+      .filter(Boolean)
+      .sort((left, right) => new Date(right) - new Date(left));
+    return timestamps[0] || syncResult?.fetched_at || null;
+  }, [banks, syncResult]);
+
   return (
     <section className="page">
       <header className="page-header">
         <div>
           <p className="eyebrow">Resumen Global</p>
-          <h2>Panel de consolidación</h2>
+          <h2>Centro de monitoreo analítico</h2>
         </div>
         <p className="page-copy">
-          Registra bancos, sincroniza transacciones y revisa el estado del motor analítico.
+          Registra bancos, captura transacciones y salta a la vista correcta según el
+          patrón o la cuenta que necesites investigar.
         </p>
       </header>
 
       {error ? <p className="form-error">{error}</p> : null}
 
-      <div className="metric-grid">
-        <article className="metric-card accent">
-          <span>Bancos registrados</span>
-          <strong>{banks.length}</strong>
-        </article>
-        <article className="metric-card">
-          <span>Total alertas</span>
-          <strong>{summary?.total_alerts ?? 0}</strong>
-        </article>
-        <article className="metric-card">
-          <span>High</span>
-          <strong>{summary?.high ?? 0}</strong>
-        </article>
-        <article className="metric-card">
-          <span>Medium</span>
-          <strong>{summary?.medium ?? 0}</strong>
-        </article>
+      <section className="hero-panel executive-hero">
+        <div className="hero-grid">
+          <div>
+            <p className="eyebrow">Situación Actual</p>
+            <h3>Consola ejecutiva del ecosistema FlowLens</h3>
+            <p className="page-copy">
+              {loading
+                ? "Cargando estado consolidado..."
+                : `${onlineBanks} banco(s) en línea, ${summary?.total_alerts ?? 0} alertas activas y ${
+                    topPattern ? `${topPattern[1]} casos del patrón ${patternLabel(topPattern[0])}` : "sin patrones dominantes aún"
+                  }.`}
+            </p>
+            <div className="panel-actions">
+              <button
+                type="button"
+                className="primary-button"
+                onClick={handleSync}
+                disabled={working}
+              >
+                {working ? "Procesando..." : "Sincronizar ahora"}
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={handleRegisterDemoBanks}
+                disabled={working}
+              >
+                Registrar bancos demo
+              </button>
+              <Link className="secondary-button" to="/alerts">
+                Abrir alertas
+              </Link>
+            </div>
+          </div>
+
+          <div className="status-grid">
+            <article className="status-card">
+              <small>Último fetch</small>
+              <strong>{latestFetch ? formatDate(latestFetch) : "Nunca"}</strong>
+            </article>
+            <article className="status-card">
+              <small>Bancos online</small>
+              <strong>{onlineBanks}</strong>
+            </article>
+            <article className="status-card">
+              <small>Bancos con error</small>
+              <strong>{errorBanks}</strong>
+            </article>
+            <article className="status-card">
+              <small>Patrón dominante</small>
+              <strong>{topPattern ? patternLabel(topPattern[0]) : "Sin datos"}</strong>
+            </article>
+          </div>
+        </div>
+
+        <div className="hero-stat-strip">
+          <article className="metric-card accent">
+            <span>Bancos registrados</span>
+            <strong>{banks.length}</strong>
+          </article>
+          <article className="metric-card">
+            <span>Total alertas</span>
+            <strong>{summary?.total_alerts ?? 0}</strong>
+          </article>
+          <article className="metric-card">
+            <span>High</span>
+            <strong>{summary?.high ?? 0}</strong>
+          </article>
+          <article className="metric-card">
+            <span>Medium</span>
+            <strong>{summary?.medium ?? 0}</strong>
+          </article>
+        </div>
+      </section>
+
+      <div className="link-tile-grid">
+        <Link className="link-tile" to="/alerts?level=high">
+          <strong>Priorizar alertas high</strong>
+          <span>Abre la bandeja filtrada directamente en el nivel más crítico.</span>
+        </Link>
+        <Link className="link-tile" to="/network">
+          <strong>Explorar red transaccional</strong>
+          <span>Revisa clústeres, cuentas activas y enlaces de mayor volumen.</span>
+        </Link>
+        <Link className="link-tile" to="/follow-up">
+          <strong>Investigar una cuenta</strong>
+          <span>Salta a follow-up para profundizar en métricas y contrapartes.</span>
+        </Link>
       </div>
 
       <div className="two-column-grid">
-        <article className="panel">
-          <div className="panel-header">
-            <h3>Acciones rápidas</h3>
-            <span>{working ? "Procesando..." : "Demo operativa"}</span>
-          </div>
-          <div className="action-stack">
-            <button
-              type="button"
-              className="primary-button"
-              onClick={handleRegisterDemoBanks}
-              disabled={working}
-            >
-              Registrar bancos demo
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={handleSync}
-              disabled={working}
-            >
-              Sincronizar transacciones
-            </button>
-          </div>
-          <p className="empty-state analytics-note">
-            Si ejecutaste <code>seed_flowlens.py</code> y los seeds de cada banco, esta sincronización traerá las transacciones y regenerará las alertas.
-          </p>
-          {syncResult ? (
-            <div className="report-grid compact">
-              <div className="compact-metric">
-                <small>Bancos procesados</small>
-                <strong>{syncResult.banks_processed}</strong>
-              </div>
-              <div className="compact-metric">
-                <small>Transacciones vistas</small>
-                <strong>{syncResult.transactions_seen}</strong>
-              </div>
-              <div className="compact-metric">
-                <small>Alertas generadas</small>
-                <strong>{syncResult.alerts_generated}</strong>
-              </div>
-            </div>
-          ) : null}
-        </article>
-
         <article className="panel">
           <div className="panel-header">
             <h3>Patrones detectados</h3>
             <span>{loading ? "Cargando..." : "Motor heurístico"}</span>
           </div>
           <div className="detail-list">
-            {Object.entries(summary?.by_pattern || {}).map(([pattern, count]) => (
+            {topPatterns.map(([pattern, count]) => (
               <div className="detail-item" key={pattern}>
                 <div>
-                  <p>{pattern}</p>
-                  <span>Patrón activo en el consolidado</span>
+                  <p>{patternLabel(pattern)}</p>
+                  <span>Patrón activo en el consolidado analítico</span>
+                  <div className="detail-item-actions">
+                    <Link
+                      className="inline-link-button"
+                      to={`/alerts?pattern=${encodeURIComponent(pattern)}`}
+                    >
+                      Ver alertas
+                    </Link>
+                    <Link
+                      className="inline-link-button"
+                      to={`/alerts?pattern=${encodeURIComponent(pattern)}&level=high`}
+                    >
+                      Ver high
+                    </Link>
+                  </div>
                 </div>
                 <div className="detail-item-side">
                   <strong>{count}</strong>
                 </div>
               </div>
             ))}
-            {!Object.keys(summary?.by_pattern || {}).length ? (
+            {!topPatterns.length ? (
               <p className="empty-state">Aún no hay patrones detectados.</p>
             ) : null}
+          </div>
+        </article>
+
+        <article className="panel">
+          <div className="panel-header">
+            <h3>Resultado de última captura</h3>
+            <span>{syncResult ? "Última ejecución" : "Aún sin captura manual"}</span>
+          </div>
+          <p className="empty-state analytics-note">
+            Si ejecutaste <code>seed_flowlens.py</code> y los seeds locales, la
+            sincronización captura transacciones de los bancos registrados y regenera alertas.
+          </p>
+          <div className="report-grid compact">
+            <div className="compact-metric">
+              <small>Bancos procesados</small>
+              <strong>{syncResult?.banks_processed ?? banks.length}</strong>
+            </div>
+            <div className="compact-metric">
+              <small>Transacciones vistas</small>
+              <strong>{syncResult?.transactions_seen ?? 0}</strong>
+            </div>
+            <div className="compact-metric">
+              <small>Alertas generadas</small>
+              <strong>{syncResult?.alerts_generated ?? 0}</strong>
+            </div>
           </div>
         </article>
       </div>
@@ -183,17 +273,21 @@ export default function OverviewPage() {
                 <tr>
                   <th>Código</th>
                   <th>Nombre</th>
-                  <th>URL</th>
                   <th>Estado</th>
                   <th>Último fetch</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {banks.map((bank) => (
                   <tr key={bank.id}>
                     <td>{bank.bank_code}</td>
-                    <td>{bank.bank_name}</td>
-                    <td>{bank.api_url}</td>
+                    <td>
+                      <strong>{bank.bank_name}</strong>
+                      <div style={{ color: "#8ea5a8", fontSize: "0.82rem", marginTop: 4 }}>
+                        {bank.api_url}
+                      </div>
+                    </td>
                     <td>
                       <span
                         className={`risk-pill ${
@@ -208,11 +302,29 @@ export default function OverviewPage() {
                       </span>
                     </td>
                     <td>{bank.last_fetched_at ? formatDate(bank.last_fetched_at) : "Nunca"}</td>
+                    <td>
+                      <div className="table-actions">
+                        <Link
+                          className="inline-link-button"
+                          to={`/network?bank=${encodeURIComponent(bank.bank_code)}`}
+                        >
+                          Ver red
+                        </Link>
+                        <Link
+                          className="inline-link-button"
+                          to={`/alerts?bank=${encodeURIComponent(bank.bank_code)}`}
+                        >
+                          Ver alertas
+                        </Link>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {!banks.length ? <p className="empty-state">No hay bancos registrados todavía.</p> : null}
+            {!banks.length ? (
+              <p className="empty-state">No hay bancos registrados todavía.</p>
+            ) : null}
           </div>
         </article>
 
@@ -229,6 +341,22 @@ export default function OverviewPage() {
                   <span>
                     {alert.bank_code} · {alert.account_number} · {formatDate(alert.created_at)}
                   </span>
+                  <div className="detail-item-actions">
+                    <Link
+                      className="inline-link-button"
+                      to={`/follow-up?account=${encodeURIComponent(alert.account_number)}`}
+                    >
+                      Follow-up
+                    </Link>
+                    <Link
+                      className="inline-link-button"
+                      to={`/network?bank=${encodeURIComponent(alert.bank_code)}&risk=${encodeURIComponent(
+                        alert.level,
+                      )}&account=${encodeURIComponent(alert.account_number)}`}
+                    >
+                      Ver en red
+                    </Link>
+                  </div>
                 </div>
                 <div className="detail-item-side">
                   <span className={`risk-pill ${alert.level}`}>{alert.level}</span>

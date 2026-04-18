@@ -3,6 +3,7 @@ from collections import defaultdict
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from ..core.money import ZERO_MONEY, sum_money, to_money
 from ..models.observed_transaction import ObservedTransaction
 from ..schemas.account import (
     AccountFollowUpResponse,
@@ -72,10 +73,10 @@ def get_account_follow_up(db: Session, account_number: str) -> AccountFollowUpRe
         }
     )
 
-    counterparty_stats: dict[tuple[str, str], dict[str, float | int | str]] = defaultdict(
+    counterparty_stats: dict[tuple[str, str], dict[str, object]] = defaultdict(
         lambda: {
             "transaction_count": 0,
-            "total_amount": 0.0,
+            "total_amount": ZERO_MONEY,
             "direction": "mixed",
         }
     )
@@ -102,13 +103,13 @@ def get_account_follow_up(db: Session, account_number: str) -> AccountFollowUpRe
             bank_code=bank_code,
             direction=str(values["direction"]),
             transaction_count=int(values["transaction_count"]),
-            total_amount=round(float(values["total_amount"]), 2),
+            total_amount=to_money(values["total_amount"]),
         )
         for (counterparty, bank_code), values in sorted(
             counterparty_stats.items(),
             key=lambda item: (
                 -int(item[1]["transaction_count"]),
-                -float(item[1]["total_amount"]),
+                -item[1]["total_amount"],
                 item[0][0],
             ),
         )[:10]
@@ -120,7 +121,7 @@ def get_account_follow_up(db: Session, account_number: str) -> AccountFollowUpRe
             bank_code=transaction.bank_code,
             source_account_number=transaction.source_account_number,
             destination_account_number=transaction.destination_account_number,
-            amount=round(transaction.amount, 2),
+            amount=to_money(transaction.amount),
             currency=transaction.currency,
             transaction_type=transaction.transaction_type,
             status=transaction.status,
@@ -137,20 +138,18 @@ def get_account_follow_up(db: Session, account_number: str) -> AccountFollowUpRe
         bank_code=normalized_account.split("-", 1)[0],
         incoming_count=len(incoming),
         outgoing_count=len(outgoing),
-        total_incoming_amount=round(sum(item.amount for item in incoming), 2),
-        total_outgoing_amount=round(sum(item.amount for item in outgoing), 2),
-        average_incoming_amount=round(
-            sum(item.amount for item in incoming) / len(incoming),
-            2,
+        total_incoming_amount=sum_money(item.amount for item in incoming),
+        total_outgoing_amount=sum_money(item.amount for item in outgoing),
+        average_incoming_amount=to_money(
+            sum_money(item.amount for item in incoming) / len(incoming),
         )
         if incoming
-        else 0.0,
-        average_outgoing_amount=round(
-            sum(item.amount for item in outgoing) / len(outgoing),
-            2,
+        else ZERO_MONEY,
+        average_outgoing_amount=to_money(
+            sum_money(item.amount for item in outgoing) / len(outgoing),
         )
         if outgoing
-        else 0.0,
+        else ZERO_MONEY,
         high_amount_count=sum(
             1 for item in transactions if item.amount >= HIGH_AMOUNT_THRESHOLD
         ),
@@ -166,4 +165,3 @@ def get_account_follow_up(db: Session, account_number: str) -> AccountFollowUpRe
             indirect_counterparties=len(indirect_counterparties),
         ),
     )
-

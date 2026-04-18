@@ -2,18 +2,21 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import timedelta
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from ..core.money import sum_money
 from ..models.observed_transaction import ObservedTransaction
 from ..models.risk_alert import RiskAlert
 from ..schemas.alert import RiskAlertResponse, RiskAlertSummaryResponse
 
-HIGH_AMOUNT_THRESHOLD = 10_000
-SMALL_TX_THRESHOLD = 250
+HIGH_AMOUNT_THRESHOLD = Decimal("10000.00")
+SMALL_TX_THRESHOLD = Decimal("250.00")
 SMALL_TX_COUNT_THRESHOLD = 5
 REPEATED_PAIR_THRESHOLD = 3
 STAR_THRESHOLD = 4
+RAPID_FLOW_RATIO = Decimal("0.70")
 
 
 def _score_to_level(score: int) -> str:
@@ -120,8 +123,8 @@ def recompute_risk_alerts(db: Session) -> int:
             if item.destination_account_number == transaction.source_account_number
             and item.created_at >= two_hours_ago
         ]
-        incoming_total = sum(item.amount for item in recent_incoming)
-        if incoming_total and transaction.amount >= incoming_total * 0.7:
+        incoming_total = sum_money(item.amount for item in recent_incoming)
+        if incoming_total and transaction.amount >= incoming_total * RAPID_FLOW_RATIO:
             _create_alert(
                 db,
                 transaction,
@@ -155,7 +158,7 @@ def recompute_risk_alerts(db: Session) -> int:
             if item.destination_account_number == transaction.source_account_number
             and item.created_at >= one_hour_ago
             and item.id != transaction.id
-            and transaction.amount >= item.amount * 0.7
+            and transaction.amount >= item.amount * RAPID_FLOW_RATIO
         ]
         if chain_origins:
             _create_alert(

@@ -1,50 +1,67 @@
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { analyticsRequest, formatCurrency, formatDate } from "../api";
 import { useAnalysisAuth } from "../auth";
+
+function riskRank(level) {
+  return { low: 1, medium: 2, high: 3 }[level] || 0;
+}
+
+function highestRiskLevel(alerts) {
+  return alerts.reduce((current, alert) => {
+    return riskRank(alert.level) > riskRank(current) ? alert.level : current;
+  }, "low");
+}
+
+function directionLabel(direction) {
+  if (direction === "incoming") {
+    return "Entrante";
+  }
+  if (direction === "outgoing") {
+    return "Saliente";
+  }
+  return "Mixta";
+}
 
 export default function FollowUpPage() {
   const { apiKey } = useAnalysisAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [accountInput, setAccountInput] = useState(searchParams.get("account") || "");
+  const accountFromUrl = (searchParams.get("account") || "").trim().toUpperCase();
+  const [accountInput, setAccountInput] = useState(accountFromUrl);
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function loadReport(accountNumber) {
-    if (!accountNumber) {
+  useEffect(() => {
+    setAccountInput(accountFromUrl);
+    if (!accountFromUrl) {
       setReport(null);
+      setError("");
       return;
     }
 
     setLoading(true);
     setError("");
-    try {
-      const payload = await analyticsRequest(
-        `/accounts/${encodeURIComponent(accountNumber)}/follow-up`,
-        { apiKey },
-      );
-      setReport(payload);
-      setSearchParams({ account: accountNumber });
-    } catch (loadError) {
-      setReport(null);
-      setError(loadError.message);
-    } finally {
-      setLoading(false);
-    }
-  }
+    analyticsRequest(`/accounts/${encodeURIComponent(accountFromUrl)}/follow-up`, {
+      apiKey,
+    })
+      .then((payload) => setReport(payload))
+      .catch((loadError) => {
+        setReport(null);
+        setError(loadError.message);
+      })
+      .finally(() => setLoading(false));
+  }, [accountFromUrl, apiKey]);
 
-  useEffect(() => {
-    const initialAccount = searchParams.get("account");
-    if (initialAccount) {
-      setAccountInput(initialAccount);
-      loadReport(initialAccount);
-    }
-  }, [apiKey]);
+  const maxRisk = useMemo(
+    () => highestRiskLevel(report?.alerts || []),
+    [report?.alerts],
+  );
 
   function handleSubmit(event) {
     event.preventDefault();
-    loadReport(accountInput.trim().toUpperCase());
+    const normalized = accountInput.trim().toUpperCase();
+    setSearchParams(normalized ? { account: normalized } : {});
   }
 
   return (
@@ -55,7 +72,8 @@ export default function FollowUpPage() {
           <h2>Seguimiento profundo de cuenta</h2>
         </div>
         <p className="page-copy">
-          Analiza una cuenta puntual: historial, contrapartes, métricas y alertas asociadas.
+          Abre una cuenta concreta y revisa su exposición, red de contrapartes, alertas
+          asociadas y secuencia reciente de movimientos.
         </p>
       </header>
 
@@ -74,7 +92,9 @@ export default function FollowUpPage() {
             />
           </label>
           <div className="filter-actions">
-            <button type="submit" className="primary-button">Consultar</button>
+            <button type="submit" className="primary-button">
+              Consultar
+            </button>
             <button
               type="button"
               className="secondary-button"
@@ -93,30 +113,62 @@ export default function FollowUpPage() {
 
       {report ? (
         <>
-          <div className="metric-grid">
-            <article className="metric-card">
-              <span>Cuenta</span>
-              <strong>{report.account_number}</strong>
-            </article>
-            <article className="metric-card">
-              <span>Total entrante</span>
-              <strong>{formatCurrency(report.total_incoming_amount)}</strong>
-            </article>
-            <article className="metric-card">
-              <span>Total saliente</span>
-              <strong>{formatCurrency(report.total_outgoing_amount)}</strong>
-            </article>
-            <article className="metric-card accent">
-              <span>Alertas asociadas</span>
-              <strong>{report.alerts.length}</strong>
-            </article>
-          </div>
+          <section className="hero-panel followup-hero">
+            <div className="followup-headline">
+              <div>
+                <p className="eyebrow">Cuenta Investigada</p>
+                <h3 className="followup-account">{report.account_number}</h3>
+                <div className="followup-meta">
+                  <span className="active-filter-tag">Banco {report.bank_code}</span>
+                  <span className={`risk-pill ${maxRisk}`}>Riesgo máximo {maxRisk}</span>
+                  <span className="active-filter-tag">
+                    {report.network_position.unique_counterparties} contrapartes únicas
+                  </span>
+                </div>
+              </div>
+              <div className="panel-actions">
+                <Link
+                  className="inline-link-button"
+                  to={`/alerts?account=${encodeURIComponent(report.account_number)}`}
+                >
+                  Ver alertas
+                </Link>
+                <Link
+                  className="inline-link-button"
+                  to={`/network?bank=${encodeURIComponent(report.bank_code)}&account=${encodeURIComponent(
+                    report.account_number,
+                  )}`}
+                >
+                  Ver en red
+                </Link>
+              </div>
+            </div>
+
+            <div className="hero-stat-strip">
+              <article className="metric-card">
+                <span>Total entrante</span>
+                <strong>{formatCurrency(report.total_incoming_amount)}</strong>
+              </article>
+              <article className="metric-card">
+                <span>Total saliente</span>
+                <strong>{formatCurrency(report.total_outgoing_amount)}</strong>
+              </article>
+              <article className="metric-card">
+                <span>Alertas asociadas</span>
+                <strong>{report.alerts.length}</strong>
+              </article>
+              <article className="metric-card accent">
+                <span>Montos altos</span>
+                <strong>{report.high_amount_count}</strong>
+              </article>
+            </div>
+          </section>
 
           <div className="two-column-grid">
             <article className="panel">
               <div className="panel-header">
                 <h3>Métricas</h3>
-                <span>{report.bank_code}</span>
+                <span>Comportamiento transaccional</span>
               </div>
               <div className="report-grid">
                 <div className="compact-metric">
@@ -128,10 +180,6 @@ export default function FollowUpPage() {
                   <strong>{report.outgoing_count}</strong>
                 </div>
                 <div className="compact-metric">
-                  <small>Montos altos</small>
-                  <strong>{report.high_amount_count}</strong>
-                </div>
-                <div className="compact-metric">
                   <small>Promedio entrada</small>
                   <strong>{formatCurrency(report.average_incoming_amount)}</strong>
                 </div>
@@ -140,19 +188,6 @@ export default function FollowUpPage() {
                   <strong>{formatCurrency(report.average_outgoing_amount)}</strong>
                 </div>
                 <div className="compact-metric">
-                  <small>Contrapartes únicas</small>
-                  <strong>{report.network_position.unique_counterparties}</strong>
-                </div>
-              </div>
-            </article>
-
-            <article className="panel">
-              <div className="panel-header">
-                <h3>Posición en red</h3>
-                <span>Conectividad</span>
-              </div>
-              <div className="report-grid">
-                <div className="compact-metric">
                   <small>Incoming edges</small>
                   <strong>{report.network_position.incoming_edges}</strong>
                 </div>
@@ -160,16 +195,43 @@ export default function FollowUpPage() {
                   <small>Outgoing edges</small>
                   <strong>{report.network_position.outgoing_edges}</strong>
                 </div>
-                <div className="compact-metric">
-                  <small>Indirectas</small>
-                  <strong>{report.network_position.indirect_counterparties}</strong>
-                </div>
               </div>
-              <div className="tag-list">
-                {report.direct_counterparties.map((counterparty) => (
-                  <span key={counterparty} className="network-chip">{counterparty}</span>
-                ))}
-                {!report.direct_counterparties.length ? <p className="empty-state">Sin contrapartes directas.</p> : null}
+            </article>
+
+            <article className="panel">
+              <div className="panel-header">
+                <h3>Posición en red</h3>
+                <span>Contrapartes y expansión</span>
+              </div>
+              <div className="context-grid">
+                <div className="context-card">
+                  <small>Contrapartes directas</small>
+                  <div className="tag-list">
+                    {report.direct_counterparties.slice(0, 10).map((counterparty) => (
+                      <Link
+                        key={counterparty}
+                        className="network-chip"
+                        to={`/follow-up?account=${encodeURIComponent(counterparty)}`}
+                      >
+                        {counterparty}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+                <div className="context-card">
+                  <small>Contrapartes indirectas</small>
+                  <div className="tag-list">
+                    {report.indirect_counterparties.slice(0, 10).map((counterparty) => (
+                      <Link
+                        key={counterparty}
+                        className="network-chip"
+                        to={`/follow-up?account=${encodeURIComponent(counterparty)}`}
+                      >
+                        {counterparty}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
               </div>
             </article>
           </div>
@@ -189,6 +251,7 @@ export default function FollowUpPage() {
                       <th>Dirección</th>
                       <th>Tx</th>
                       <th>Volumen</th>
+                      <th>Acción</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -196,14 +259,24 @@ export default function FollowUpPage() {
                       <tr key={counterparty.account_number}>
                         <td>{counterparty.account_number}</td>
                         <td>{counterparty.bank_code}</td>
-                        <td>{counterparty.direction}</td>
+                        <td>{directionLabel(counterparty.direction)}</td>
                         <td>{counterparty.transaction_count}</td>
                         <td>{formatCurrency(counterparty.total_amount)}</td>
+                        <td>
+                          <Link
+                            className="inline-link-button"
+                            to={`/follow-up?account=${encodeURIComponent(counterparty.account_number)}`}
+                          >
+                            Abrir
+                          </Link>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {!report.frequent_counterparties.length ? <p className="empty-state">Sin contrapartes frecuentes.</p> : null}
+                {!report.frequent_counterparties.length ? (
+                  <p className="empty-state">Sin contrapartes frecuentes.</p>
+                ) : null}
               </div>
             </article>
 
@@ -218,6 +291,24 @@ export default function FollowUpPage() {
                     <div>
                       <p>{alert.reason}</p>
                       <span>{alert.pattern_type} · {formatDate(alert.created_at)}</span>
+                      <div className="detail-item-actions">
+                        <Link
+                          className="inline-link-button"
+                          to={`/alerts?account=${encodeURIComponent(report.account_number)}&pattern=${encodeURIComponent(
+                            alert.pattern_type,
+                          )}`}
+                        >
+                          Ver patrón
+                        </Link>
+                        <Link
+                          className="inline-link-button"
+                          to={`/network?bank=${encodeURIComponent(report.bank_code)}&risk=${encodeURIComponent(
+                            alert.level,
+                          )}&account=${encodeURIComponent(report.account_number)}`}
+                        >
+                          Ver en red
+                        </Link>
+                      </div>
                     </div>
                     <div className="detail-item-side">
                       <span className={`risk-pill ${alert.level}`}>{alert.level}</span>
@@ -225,47 +316,85 @@ export default function FollowUpPage() {
                     </div>
                   </div>
                 ))}
-                {!report.alerts.length ? <p className="empty-state">No hay alertas asociadas.</p> : null}
+                {!report.alerts.length ? (
+                  <p className="empty-state">No hay alertas asociadas.</p>
+                ) : null}
               </div>
             </article>
           </div>
 
-          <article className="panel">
-            <div className="panel-header">
-              <h3>Transacciones recientes</h3>
-              <span>{report.recent_transactions.length}</span>
-            </div>
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Banco</th>
-                    <th>Origen</th>
-                    <th>Destino</th>
-                    <th>Monto</th>
-                    <th>Tipo</th>
-                    <th>Estado</th>
-                    <th>Canal</th>
-                    <th>Fecha</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.recent_transactions.map((transaction) => (
-                    <tr key={`${transaction.bank_code}-${transaction.transaction_id}`}>
-                      <td>{transaction.bank_code}</td>
-                      <td>{transaction.source_account_number}</td>
-                      <td>{transaction.destination_account_number}</td>
-                      <td>{formatCurrency(transaction.amount)}</td>
-                      <td>{transaction.transaction_type}</td>
-                      <td>{transaction.status}</td>
-                      <td>{transaction.channel}</td>
-                      <td>{formatDate(transaction.created_at)}</td>
+          <div className="two-column-grid">
+            <article className="panel">
+              <div className="panel-header">
+                <h3>Timeline reciente</h3>
+                <span>{report.recent_transactions.length} eventos</span>
+              </div>
+              <div className="timeline">
+                {report.recent_transactions.map((transaction) => {
+                  const isOutgoing =
+                    transaction.source_account_number === report.account_number;
+                  const counterparty = isOutgoing
+                    ? transaction.destination_account_number
+                    : transaction.source_account_number;
+
+                  return (
+                    <div
+                      key={`${transaction.bank_code}-${transaction.transaction_id}`}
+                      className="timeline-item"
+                    >
+                      <div className={`timeline-marker ${isOutgoing ? "out" : "in"}`} />
+                      <div className="timeline-content">
+                        <p>
+                          {isOutgoing ? "Salida hacia" : "Ingreso desde"} {counterparty}
+                        </p>
+                        <span>
+                          {transaction.transaction_type} · {transaction.channel} ·{" "}
+                          {formatDate(transaction.created_at)}
+                        </span>
+                      </div>
+                      <div className={`timeline-amount ${isOutgoing ? "out" : "in"}`}>
+                        {isOutgoing ? "−" : "+"}
+                        {formatCurrency(transaction.amount)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
+
+            <article className="panel">
+              <div className="panel-header">
+                <h3>Ledger reciente</h3>
+                <span>Detalle transaccional</span>
+              </div>
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Banco</th>
+                      <th>Origen</th>
+                      <th>Destino</th>
+                      <th>Monto</th>
+                      <th>Tipo</th>
+                      <th>Estado</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </article>
+                  </thead>
+                  <tbody>
+                    {report.recent_transactions.map((transaction) => (
+                      <tr key={`table-${transaction.bank_code}-${transaction.transaction_id}`}>
+                        <td>{transaction.bank_code}</td>
+                        <td>{transaction.source_account_number}</td>
+                        <td>{transaction.destination_account_number}</td>
+                        <td>{formatCurrency(transaction.amount)}</td>
+                        <td>{transaction.transaction_type}</td>
+                        <td>{transaction.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </div>
         </>
       ) : (
         <article className="panel">

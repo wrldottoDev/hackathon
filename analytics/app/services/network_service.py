@@ -2,6 +2,7 @@ from collections import defaultdict
 
 from sqlalchemy.orm import Session
 
+from ..core.money import ZERO_MONEY, to_money
 from ..models.observed_transaction import ObservedTransaction
 from ..models.risk_alert import RiskAlert
 from ..schemas.network import GraphEdge, GraphNode, GraphResponse
@@ -31,14 +32,14 @@ def get_network_graph(db: Session) -> GraphResponse:
         node_levels[alert.account_number].append(alert.level)
 
     node_counts: dict[str, int] = defaultdict(int)
-    edge_map: dict[tuple[str, str], dict[str, float | int]] = {}
+    edge_map: dict[tuple[str, str], dict[str, object]] = {}
 
     for transaction in transactions:
         node_counts[transaction.source_account_number] += 1
         node_counts[transaction.destination_account_number] += 1
         key = (transaction.source_account_number, transaction.destination_account_number)
         if key not in edge_map:
-            edge_map[key] = {"amount": 0.0, "count": 0}
+            edge_map[key] = {"amount": ZERO_MONEY, "count": 0}
         edge_map[key]["amount"] += transaction.amount
         edge_map[key]["count"] += 1
 
@@ -56,10 +57,9 @@ def get_network_graph(db: Session) -> GraphResponse:
         GraphEdge(
             source=source,
             target=destination,
-            amount=round(values["amount"], 2),
+            amount=to_money(values["amount"]),
             count=int(values["count"]),
         )
         for (source, destination), values in sorted(edge_map.items())
     ]
     return GraphResponse(nodes=nodes, edges=edges)
-

@@ -1,4 +1,5 @@
 import os
+from decimal import Decimal
 from typing import Any
 
 import httpx
@@ -49,7 +50,7 @@ def create_interbank_transfer(
     token: str,
     source_account_number: str,
     destination_account_number: str,
-    amount: float,
+    amount: Decimal | int | str,
     *,
     channel: str,
     location: str,
@@ -71,24 +72,32 @@ def create_interbank_transfer(
     )
 
 
-def register_banks_in_analytics(client: httpx.Client):
+def register_banks_in_analytics(client: httpx.Client) -> Any:
     headers = {"X-Analytics-Key": ANALYTICS_API_KEY}
     for bank_name, bank_code, api_url in [
         ("Banco A", "BKA", BANK_A_URL),
         ("Banco B", "BKB", BANK_B_URL),
     ]:
-        request_json(
-            client,
-            "POST",
-            f"{ANALYTICS_URL}/banks/register",
-            headers=headers,
-            json={
-                "bank_name": bank_name,
-                "bank_code": bank_code,
-                "api_url": api_url,
-                "status": "active",
-            },
-        )
+        try:
+            request_json(
+                client,
+                "POST",
+                f"{ANALYTICS_URL}/banks/register",
+                headers=headers,
+                json={
+                    "bank_name": bank_name,
+                    "bank_code": bank_code,
+                    "api_url": api_url,
+                    "status": "active",
+                },
+            )
+            print(f"  Banco {bank_code} registrado en analytics")
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 400:
+                print(f"  Banco {bank_code} ya estaba registrado")
+            else:
+                raise
+
     return request_json(
         client,
         "GET",
@@ -99,14 +108,20 @@ def register_banks_in_analytics(client: httpx.Client):
 
 def main():
     with httpx.Client(timeout=10.0) as client:
+        print("=== FlowLens Interbank Seed ===\n")
+
+        # Login en los bancos ligados a analytics
+        print("Autenticando usuarios demo...")
         a_token, a_accounts = login(client, BANK_A_URL, "demo@bancoa.com")
         b_token, b_accounts = login(client, BANK_B_URL, "demo@bancob.com")
+        print("  OK: Banco A, Banco B")
 
         a_primary = a_accounts[0]["account_number"]
         a_secondary = a_accounts[1]["account_number"] if len(a_accounts) > 1 else a_primary
         b_primary = b_accounts[0]["account_number"]
         b_secondary = b_accounts[1]["account_number"] if len(b_accounts) > 1 else b_primary
 
+        print("\nCreando transferencias interbancarias A → B...")
         create_interbank_transfer(
             client,
             BANK_A_URL,
@@ -116,7 +131,7 @@ def main():
             13_500,
             channel="api",
             location="Cross-bank API",
-            description="Transferencia interbancaria de alto monto",
+            description="Transferencia interbancaria de alto monto A→B",
         )
         for amount in [180, 195, 210, 225]:
             create_interbank_transfer(
@@ -128,8 +143,11 @@ def main():
                 amount,
                 channel="mobile",
                 location="San Jose, CR",
-                description="Ráfaga interbancaria de montos pequeños",
+                description="Ráfaga interbancaria de montos pequeños A→B",
             )
+        print("  OK: 5 transferencias A→B")
+
+        print("\nCreando transferencias interbancarias B → A...")
         create_interbank_transfer(
             client,
             BANK_B_URL,
@@ -139,12 +157,15 @@ def main():
             780,
             channel="web",
             location="Heredia, CR",
-            description="Salida rápida tras ingresos interbancarios",
+            description="Salida rápida tras ingresos interbancarios B→A",
         )
+        print("  OK: 1 transferencia B→A")
 
+        print("\nRegistrando bancos en analytics y sincronizando...")
         analytics_summary = register_banks_in_analytics(client)
-        print("Interbank seed completado")
+        print("\n=== Resumen analytics ===")
         print(analytics_summary)
+        print("\nSeed interbancario completado.")
 
 
 if __name__ == "__main__":

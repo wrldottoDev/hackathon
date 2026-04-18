@@ -23,22 +23,36 @@ function AppShell({ children }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="sidebar-logo">
+        <div className="sidebar-brand">
           <div className="bank-name">{BANK_NAME}</div>
           <div className="bank-tag">Portal bancario — FlowLens</div>
         </div>
 
         <nav className="sidebar-nav">
-          <NavLink to="/" end>Inicio</NavLink>
-          <NavLink to="/accounts">Cuentas</NavLink>
-          <NavLink to="/transfer">Transferir</NavLink>
-          <NavLink to="/transactions">Transacciones</NavLink>
+          <NavLink to="/" end>
+            <span className="nav-icon">◉</span>
+            <span>Inicio</span>
+          </NavLink>
+          <NavLink to="/accounts">
+            <span className="nav-icon">▣</span>
+            <span>Cuentas</span>
+          </NavLink>
+          <NavLink to="/transfer">
+            <span className="nav-icon">↗</span>
+            <span>Transferir</span>
+          </NavLink>
+          <NavLink to="/transactions">
+            <span className="nav-icon">≋</span>
+            <span>Transacciones</span>
+          </NavLink>
         </nav>
 
         <div className="sidebar-user">
           <div className="user-name">{user?.full_name}</div>
           <div className="user-email">{user?.email}</div>
-          <button className="logout-btn" onClick={logout}>Cerrar sesión</button>
+          <button type="button" className="logout-btn" onClick={logout}>
+            Cerrar sesión
+          </button>
         </div>
       </aside>
 

@@ -24,7 +24,7 @@ export default function AccountsPage() {
     try {
       await apiRequest("/accounts", {
         method: "POST",
-        body: JSON.stringify({ initial_balance: parseFloat(balance) || 0 }),
+        body: JSON.stringify({ initial_balance: balance.trim() || "0" }),
       }, token);
       setSuccess("Cuenta creada correctamente");
       setBalance("");

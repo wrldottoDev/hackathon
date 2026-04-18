@@ -1,3 +1,4 @@
+from decimal import Decimal
 import sys
 from pathlib import Path
 
@@ -37,7 +38,7 @@ def build_transfer(
     *,
     source_account_number: str,
     destination_account_number: str,
-    amount: float,
+    amount: Decimal | int | str,
     channel: str,
     location: str,
     description: str,

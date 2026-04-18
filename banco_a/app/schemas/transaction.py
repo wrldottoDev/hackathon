@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -17,7 +18,7 @@ class TransferRequest(BaseModel):
         max_length=14,
         pattern=ACCOUNT_NUMBER_PATTERN,
     )
-    amount: float = Field(gt=0)
+    amount: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
     channel: str = Field(default="web", min_length=2, max_length=50)
     location: str = Field(default="", max_length=255)
     description: str = Field(default="", max_length=500)
@@ -49,7 +50,7 @@ class InterbankReceiveRequest(BaseModel):
         pattern=ACCOUNT_NUMBER_PATTERN,
     )
     source_bank_code: str = Field(min_length=3, max_length=10)
-    amount: float = Field(gt=0)
+    amount: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
     currency: str = Field(default="CRC", min_length=3, max_length=10)
     channel: str = Field(default="api", min_length=2, max_length=50)
     location: str = Field(default="", max_length=255)
@@ -103,7 +104,7 @@ class TransactionResponse(BaseModel):
     destination_account_number: str
     source_bank_code: str
     destination_bank_code: str
-    amount: float
+    amount: Decimal
     currency: str
     transaction_type: str
     status: str

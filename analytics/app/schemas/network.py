@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from pydantic import BaseModel
 
 
@@ -12,11 +14,10 @@ class GraphNode(BaseModel):
 class GraphEdge(BaseModel):
     source: str
     target: str
-    amount: float
+    amount: Decimal
     count: int
 
 
 class GraphResponse(BaseModel):
     nodes: list[GraphNode]
     edges: list[GraphEdge]
-

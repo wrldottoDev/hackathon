@@ -303,6 +303,10 @@ select:focus {
   cursor: pointer;
   transition: transform 160ms ease, opacity 160ms ease, background 160ms ease;
   padding: 13px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .primary-button {
@@ -398,23 +402,51 @@ select:focus {
 }
 
 .graph-canvas {
-  height: 540px;
-  border-radius: 20px;
+  height: 660px;
+  border-radius: 22px;
   overflow: hidden;
   border: 1px solid var(--line);
 }
 
 .graph-canvas.dark {
-  background:
-    radial-gradient(circle at center, rgba(41, 195, 165, 0.1) 0%, rgba(41, 195, 165, 0.04) 18%, transparent 19%),
-    radial-gradient(circle at center, transparent 0 31%, rgba(255, 255, 255, 0.035) 31.4%, transparent 32%),
-    radial-gradient(circle at center, transparent 0 47%, rgba(255, 255, 255, 0.03) 47.4%, transparent 48%),
-    radial-gradient(circle at center, transparent 0 63%, rgba(255, 255, 255, 0.025) 63.4%, transparent 64%),
-    linear-gradient(180deg, rgba(9, 24, 29, 0.92), rgba(6, 15, 18, 0.95));
+  background: rgba(3, 11, 13, 0.94);
+}
+
+.graph-canvas .react-flow__node.selected,
+.graph-canvas .react-flow__edge.selected .react-flow__edge-path {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .graph-canvas.circular {
   position: relative;
+}
+
+.graph-legend {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 14px;
+  color: var(--muted);
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.legend-dot.low {
+  background: var(--teal);
+}
+
+.legend-dot.medium {
+  background: var(--gold);
+}
+
+.legend-dot.high {
+  background: var(--danger);
 }
 
 .table-wrapper {
@@ -446,6 +478,240 @@ select:focus {
   color: #d5eceb;
 }
 
+.hero-panel {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 24px;
+  background:
+    linear-gradient(135deg, rgba(41, 195, 165, 0.14), rgba(8, 27, 32, 0.96)),
+    var(--bg-panel);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
+}
+
+.hero-panel h3,
+.followup-account {
+  margin: 0;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  letter-spacing: -0.03em;
+}
+
+.hero-grid,
+.context-grid,
+.link-tile-grid,
+.hero-stat-strip {
+  display: grid;
+  gap: 16px;
+}
+
+.hero-grid {
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+  align-items: start;
+}
+
+.hero-stat-strip {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.status-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.status-card,
+.context-card {
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.status-card small,
+.context-card small {
+  display: block;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.status-card strong,
+.context-card strong {
+  display: block;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.status-card p,
+.context-card p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.panel-actions,
+.detail-item-actions,
+.table-actions,
+.filter-chip-row,
+.active-filters,
+.followup-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.link-tile-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.link-tile {
+  border-radius: 20px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.link-tile:hover {
+  transform: translateY(-1px);
+  border-color: rgba(41, 195, 165, 0.28);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.link-tile strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.link-tile span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.inline-link-button,
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.inline-link-button:hover,
+.filter-chip:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.filter-chip.active {
+  background: rgba(41, 195, 165, 0.14);
+  border-color: rgba(41, 195, 165, 0.32);
+  color: #dff9f2;
+}
+
+.filter-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.active-filter-tag {
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  font-size: 0.78rem;
+}
+
+.alert-row.high td {
+  background: rgba(255, 122, 89, 0.03);
+}
+
+.alert-row.medium td {
+  background: rgba(244, 183, 64, 0.02);
+}
+
+.context-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.followup-headline {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.followup-account {
+  font-size: 2rem;
+}
+
+.timeline {
+  display: grid;
+  gap: 14px;
+}
+
+.timeline-item {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.timeline-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.timeline-marker {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-top: 5px;
+}
+
+.timeline-marker.out {
+  background: var(--danger);
+}
+
+.timeline-marker.in {
+  background: var(--teal);
+}
+
+.timeline-content p,
+.timeline-content span {
+  margin: 0;
+}
+
+.timeline-content span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.timeline-amount {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.timeline-amount.out {
+  color: var(--danger);
+}
+
+.timeline-amount.in {
+  color: var(--teal);
+}
+
 code {
   font-family: "JetBrains Mono", "Fira Code", monospace;
 }
@@ -465,7 +731,11 @@ code {
   .report-grid,
   .filter-grid,
   .filter-grid.single-row,
-  .network-toolbar {
+  .network-toolbar,
+  .hero-grid,
+  .hero-stat-strip,
+  .link-tile-grid,
+  .context-grid {
     grid-template-columns: 1fr;
   }
 
@@ -476,5 +746,15 @@ code {
   .page-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .filter-summary,
+  .followup-headline {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .graph-canvas {
+    height: 520px;
   }
 }

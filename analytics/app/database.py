@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from .settings import DATABASE_URL
 
@@ -8,6 +9,7 @@ engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False},
     future=True,
+    poolclass=NullPool,
 )
 
 SessionLocal = sessionmaker(

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
@@ -23,7 +23,7 @@ class RiskAlert(Base):
     level = Column(String(20), index=True, nullable=False)
     reason = Column(Text, nullable=False)
     pattern_type = Column(String(50), index=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     observed_transaction = relationship("ObservedTransaction", back_populates="risk_alerts")
 

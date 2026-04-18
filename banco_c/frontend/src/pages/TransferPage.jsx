@@ -47,7 +47,7 @@ export default function TransferPage() {
       const isInterbank = destinationBankCode && destinationBankCode !== BANK_CODE;
       await apiRequest(isInterbank ? "/transactions/interbank" : "/transactions/internal", {
         method: "POST",
-        body: JSON.stringify({ ...form, amount: parseFloat(form.amount) }),
+        body: JSON.stringify({ ...form, amount: form.amount.trim() }),
       }, token);
       setSuccess(
         isInterbank

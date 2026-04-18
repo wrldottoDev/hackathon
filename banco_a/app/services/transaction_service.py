@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import uuid4
 
 import httpx
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from ..core.money import to_money
 from ..models.account import Account
 from ..models.transaction import Transaction
 from ..models.user import User
@@ -23,8 +25,8 @@ from ..settings import (
 )
 
 
-def _round_money(amount: float) -> float:
-    return round(amount, 2)
+def _round_money(amount: Decimal | int | float | str) -> Decimal:
+    return to_money(amount)
 
 
 def _parse_bank_code(account_number: str) -> str:
@@ -99,7 +101,7 @@ def _build_transaction(
     destination_account_number: str,
     source_bank_code: str,
     destination_bank_code: str,
-    amount: float,
+    amount: Decimal,
     currency: str,
     transaction_type: str,
     status: str,
@@ -260,32 +262,38 @@ def create_interbank_transfer(
     try:
         response = httpx.post(
             f"{destination_bank_url}/interbank/receive",
-            json=receive_payload.model_dump(),
+            json=receive_payload.model_dump(mode="json"),
             headers=_service_headers(),
             timeout=INTERBANK_TIMEOUT_SECONDS,
         )
     except httpx.HTTPError as exc:
         failure_reason = "No se pudo comunicar con el banco destino"
-        _record_failed_interbank_transaction(
-            db,
-            data,
-            source,
-            destination_bank_code,
-            external_reference,
-            failure_reason,
-        )
+        try:
+            _record_failed_interbank_transaction(
+                db,
+                data,
+                source,
+                destination_bank_code,
+                external_reference,
+                failure_reason,
+            )
+        except Exception:
+            db.rollback()
         raise HTTPException(status_code=502, detail=failure_reason) from exc
 
     if response.is_error:
         failure_reason = _extract_response_detail(response)
-        _record_failed_interbank_transaction(
-            db,
-            data,
-            source,
-            destination_bank_code,
-            external_reference,
-            failure_reason,
-        )
+        try:
+            _record_failed_interbank_transaction(
+                db,
+                data,
+                source,
+                destination_bank_code,
+                external_reference,
+                failure_reason,
+            )
+        except Exception:
+            db.rollback()
         raise HTTPException(
             status_code=400 if 400 <= response.status_code < 500 else 502,
             detail=f"Banco destino rechazó la transferencia: {failure_reason}",
@@ -353,7 +361,7 @@ def _reverse_remote_interbank_credit(
     try:
         response = httpx.post(
             f"{destination_bank_url}/interbank/reverse",
-            json=payload.model_dump(),
+            json=payload.model_dump(mode="json"),
             headers=_service_headers(),
             timeout=INTERBANK_TIMEOUT_SECONDS,
         )

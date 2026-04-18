@@ -5,6 +5,7 @@ from datetime import datetime
 import httpx
 from sqlalchemy.orm import Session
 
+from ..core.money import to_money
 from ..models.bank_registry import BankRegistry
 from ..models.observed_transaction import ObservedTransaction
 from ..schemas.transaction import FetchTransactionsResponse
@@ -43,7 +44,7 @@ def _upsert_observed_transaction(
     transaction.destination_account_number = payload["destination_account_number"]
     transaction.source_bank_code = payload["source_bank_code"]
     transaction.destination_bank_code = payload["destination_bank_code"]
-    transaction.amount = payload["amount"]
+    transaction.amount = to_money(payload["amount"])
     transaction.currency = payload["currency"]
     transaction.transaction_type = payload["transaction_type"]
     transaction.status = payload["status"]
@@ -108,4 +109,3 @@ def fetch_transactions_from_registered_banks(db: Session) -> FetchTransactionsRe
         alerts_generated=alerts_generated,
         fetched_at=fetched_at,
     )
-

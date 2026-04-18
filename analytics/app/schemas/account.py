@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel
 
@@ -10,7 +11,7 @@ class FollowUpTransaction(BaseModel):
     bank_code: str
     source_account_number: str
     destination_account_number: str
-    amount: float
+    amount: Decimal
     currency: str
     transaction_type: str
     status: str
@@ -25,7 +26,7 @@ class FollowUpCounterparty(BaseModel):
     bank_code: str
     direction: str
     transaction_count: int
-    total_amount: float
+    total_amount: Decimal
 
 
 class NetworkPosition(BaseModel):
@@ -40,10 +41,10 @@ class AccountFollowUpResponse(BaseModel):
     bank_code: str
     incoming_count: int
     outgoing_count: int
-    total_incoming_amount: float
-    total_outgoing_amount: float
-    average_incoming_amount: float
-    average_outgoing_amount: float
+    total_incoming_amount: Decimal
+    total_outgoing_amount: Decimal
+    average_incoming_amount: Decimal
+    average_outgoing_amount: Decimal
     high_amount_count: int
     direct_counterparties: list[str]
     indirect_counterparties: list[str]
@@ -51,4 +52,3 @@ class AccountFollowUpResponse(BaseModel):
     alerts: list[RiskAlertResponse]
     recent_transactions: list[FollowUpTransaction]
     network_position: NetworkPosition
-

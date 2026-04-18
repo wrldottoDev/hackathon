@@ -1,265 +1,163 @@
-import { useCallback, useEffect, useState } from "react";
-import {
-  Controls,
-  Handle,
-  MiniMap,
-  Position,
-  ReactFlow,
-  useEdgesState,
-  useNodesState,
-} from "@xyflow/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Background, Controls, MiniMap, ReactFlow } from "@xyflow/react";
 import { analyticsRequest, formatCurrency } from "../api";
 import { useAnalysisAuth } from "../auth";
 
-const RISK_COLOR = { high: "#ff7a59", medium: "#f7c14a", low: "#3fd0b8" };
-const RISK_BG = {
-  high: "rgba(255,122,89,0.12)",
-  medium: "rgba(247,193,74,0.12)",
-  low: "rgba(63,208,184,0.12)",
+const RISK_COLOR = {
+  high: "#ff6b6b",
+  medium: "#f4b740",
+  low: "#29c3a5",
 };
-const RISK_ICON = { high: "⚠", medium: "◈", low: "◉" };
-const RISK_LABEL = { high: "Alto", medium: "Medio", low: "Bajo" };
 
-function splitAccountNumber(accountNumber) {
-  const [prefix, suffix = ""] = accountNumber.split("-");
-  return {
-    prefix,
-    suffix,
-    compactSuffix: suffix ? suffix.slice(-6) : accountNumber.slice(-6),
-  };
+const RISK_ICON = {
+  high: "⚠",
+  medium: "◈",
+  low: "◉",
+};
+
+const RISK_LABEL = {
+  high: "Alto",
+  medium: "Medio",
+  low: "Bajo",
+};
+
+function compactAccount(accountNumber) {
+  const [bankCode, suffix = ""] = accountNumber.split("-");
+  const compactSuffix = suffix ? suffix.slice(-6) : accountNumber.slice(-6);
+  return `${bankCode} · ${compactSuffix}`;
 }
 
-function polarToCartesian(cx, cy, radius, angle) {
-  return {
-    x: cx + Math.cos(angle) * radius,
-    y: cy + Math.sin(angle) * radius,
-  };
+function riskColor(risk) {
+  return RISK_COLOR[risk] ?? RISK_COLOR.low;
 }
 
-function AccountNode({ data }) {
-  const color = RISK_COLOR[data.risk] ?? RISK_COLOR.low;
-  const bg = RISK_BG[data.risk] ?? RISK_BG.low;
-
-  return (
-    <>
-      <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
-      <div
-        title={data.account}
-        style={{
-          width: 138,
-          height: 138,
-          borderRadius: "50%",
-          padding: 14,
-          display: "grid",
-          placeItems: "center",
-          textAlign: "center",
-          background: `
-            radial-gradient(circle at 30% 30%, rgba(255,255,255,0.14), transparent 24%),
-            linear-gradient(160deg, #0b1d23 0%, #11272d 100%)
-          `,
-          border: `2px solid ${color}`,
-          boxShadow: `0 0 22px ${color}30, inset 0 0 24px rgba(255,255,255,0.03)`,
-          position: "relative",
-        }}
-      >
-        <span
-          style={{
-            position: "absolute",
-            inset: 7,
-            borderRadius: "50%",
-            border: `1px dashed ${color}55`,
-          }}
-        />
-        <span
-          style={{
-            position: "absolute",
-            top: -8,
-            right: 12,
-            background: bg,
-            border: `1px solid ${color}`,
-            borderRadius: 999,
-            color,
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.06em",
-            padding: "2px 8px",
-            textTransform: "uppercase",
-          }}
-        >
-          {RISK_ICON[data.risk]} {RISK_LABEL[data.risk]}
-        </span>
-        <div
-          style={{
-            display: "grid",
-            gap: 4,
-            alignItems: "center",
-            justifyItems: "center",
-          }}
-        >
-          <span
-            style={{
-              background: "rgba(255,255,255,0.08)",
-              borderRadius: 999,
-              padding: "4px 10px",
-              fontSize: 10,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: "#9eb4b7",
-            }}
-          >
-            {data.bank}
-          </span>
-          <strong
-            style={{
-              margin: 0,
-              fontSize: 26,
-              lineHeight: 1,
-              letterSpacing: "-0.04em",
-              color: "#f7fbfc",
-            }}
-          >
-            {data.accountCompact}
-          </strong>
-          <span
-            style={{
-              margin: 0,
-              fontFamily: "monospace",
-              fontSize: 11,
-              color: "#8ea5a8",
-            }}
-          >
-            {data.account}
-          </span>
-          <span style={{ color, fontSize: 11, fontWeight: 700 }}>
-            {data.txCount} tx
-          </span>
-        </div>
-      </div>
-      <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
-    </>
-  );
-}
-
-const NODE_TYPES = { account: AccountNode };
-
-function layoutNodes(rawNodes) {
-  if (!rawNodes.length) {
-    return [];
+function riskLabel(risk) {
+  if (!risk) {
+    return "Todos";
   }
-
-  const byBank = {};
-  for (const node of rawNodes) {
-    if (!byBank[node.bank_code]) {
-      byBank[node.bank_code] = [];
-    }
-    byBank[node.bank_code].push(node);
-  }
-
-  const bankCodes = Object.keys(byBank).sort();
-  const graphCenter = { x: 620, y: 420 };
-  const bankOrbitRadius =
-    bankCodes.length === 1 ? 0 : Math.max(260, 190 + bankCodes.length * 55);
-  const nodeSize = 138;
-  const nodesPerRing = 8;
-  const result = [];
-
-  bankCodes.forEach((bankCode, bankIndex) => {
-    const bankNodes = byBank[bankCode]
-      .slice()
-      .sort(
-        (left, right) =>
-          right.transaction_count - left.transaction_count ||
-          left.label.localeCompare(right.label),
-      );
-
-    const bankAngle =
-      bankCodes.length === 1
-        ? -Math.PI / 2
-        : -Math.PI / 2 + (bankIndex * Math.PI * 2) / bankCodes.length;
-    const bankCenter =
-      bankCodes.length === 1
-        ? graphCenter
-        : polarToCartesian(graphCenter.x, graphCenter.y, bankOrbitRadius, bankAngle);
-
-    bankNodes.forEach((node, index) => {
-      const { compactSuffix } = splitAccountNumber(node.label);
-      const ring = Math.floor(index / nodesPerRing);
-      const ringStart = ring * nodesPerRing;
-      const ringNodes = bankNodes.slice(ringStart, ringStart + nodesPerRing);
-      const indexInRing = index - ringStart;
-      const ringRadius = bankNodes.length === 1 ? 0 : 94 + ring * 82;
-      const nodeAngle =
-        bankNodes.length === 1
-          ? -Math.PI / 2
-          : -Math.PI / 2 + (indexInRing * Math.PI * 2) / ringNodes.length;
-      const circularPoint =
-        ringRadius === 0
-          ? bankCenter
-          : polarToCartesian(bankCenter.x, bankCenter.y, ringRadius, nodeAngle);
-
-      result.push({
-        id: node.id,
-        type: "account",
-        position: {
-          x: circularPoint.x - nodeSize / 2,
-          y: circularPoint.y - nodeSize / 2,
-        },
-        data: {
-          account: node.label,
-          accountCompact: compactSuffix,
-          bank: bankCode,
-          risk: node.risk,
-          txCount: node.transaction_count,
-        },
-      });
-    });
-  });
-
-  return result;
+  return `${RISK_ICON[risk]} ${RISK_LABEL[risk]}`;
 }
 
-function buildEdges(rawEdges) {
-  return rawEdges.map((edge, idx) => {
-    const isHeavy = edge.count > 3;
+function maxRisk(...risks) {
+  if (risks.includes("high")) {
+    return "high";
+  }
+  if (risks.includes("medium")) {
+    return "medium";
+  }
+  return "low";
+}
+
+function getEdgeId(edge, index) {
+  return edge.id ?? `edge-${edge.source}-${edge.target}-${index}`;
+}
+
+function buildFlow(graph, highlightNodeIds, highlightEdgeIds) {
+  const hasHighlight = highlightNodeIds && highlightNodeIds.size > 0;
+  const centerX = 620;
+  const centerY = 350;
+  const sortedNodes = graph.nodes
+    .slice()
+    .sort(
+      (left, right) =>
+        right.transaction_count - left.transaction_count ||
+        left.label.localeCompare(right.label),
+    );
+
+  const total = Math.max(sortedNodes.length, 1);
+  const radius = Math.max(260, total * 18);
+  const nodes = sortedNodes.map((node, index) => {
+    const angle = (Math.PI * 2 * index) / total;
+    const isLit = !hasHighlight || highlightNodeIds.has(node.id);
+    const color = riskColor(node.risk);
 
     return {
-      id: `e-${edge.source}-${edge.target}-${idx}`,
-      source: edge.source,
-      target: edge.target,
-      type: "smoothstep",
-      label: `${formatCurrency(edge.amount)} · ${edge.count} tx`,
-      animated: edge.count > 1,
-      pathOptions: { borderRadius: 56, offset: 18 },
+      id: node.id,
+      position: {
+        x: centerX + radius * Math.cos(angle),
+        y: centerY + radius * Math.sin(angle),
+      },
+      data: {
+        label: `${compactAccount(node.label)} · ${node.transaction_count} tx`,
+      },
       style: {
-        stroke: isHeavy ? "#f7c14a" : "#5f7c80",
-        strokeWidth: Math.min(1.5 + edge.count * 0.5, 6),
-        strokeOpacity: 0.9,
-      },
-      labelStyle: {
-        fill: isHeavy ? "#ffd978" : "#8ea5a8",
-        fontSize: 10,
-        fontWeight: 700,
-      },
-      labelBgStyle: {
-        fill: "rgba(7,19,22,0.88)",
-        borderRadius: 6,
+        background: isLit ? "#102126" : "rgba(16,33,38,0.3)",
+        border: `2px solid ${isLit ? color : "rgba(133,166,171,0.15)"}`,
+        borderRadius: "18px",
+        color: isLit ? "#f7fbfc" : "rgba(247,251,252,0.25)",
+        width: 220,
+        padding: "14px",
+        fontSize: "12px",
+        boxShadow: isLit && hasHighlight ? `0 0 18px ${color}66` : "none",
+        transition: "all 260ms ease",
+        zIndex: isLit ? 10 : 1,
       },
     };
   });
+
+  const riskByNodeId = Object.fromEntries(
+    graph.nodes.map((node) => [node.id, node.risk]),
+  );
+
+  const edges = graph.edges.map((edge, index) => {
+    const edgeId = getEdgeId(edge, index);
+    const edgeRisk = maxRisk(riskByNodeId[edge.source], riskByNodeId[edge.target]);
+    const isLit = !hasHighlight || (highlightEdgeIds && highlightEdgeIds.has(edgeId));
+
+    return {
+      id: edgeId,
+      source: edge.source,
+      target: edge.target,
+      label: formatCurrency(edge.amount),
+      animated: isLit && edgeRisk !== "low",
+      style: {
+        stroke: isLit ? riskColor(edgeRisk) : "rgba(133,166,171,0.12)",
+        strokeWidth: isLit
+          ? edgeRisk === "high" ? 3.4 : edgeRisk === "medium" ? 2.6 : 1.8
+          : 1,
+        filter: isLit && hasHighlight ? `drop-shadow(0 0 6px ${riskColor(edgeRisk)}88)` : "none",
+        transition: "all 260ms ease",
+      },
+      labelStyle: {
+        fill: isLit ? "#c8dfe0" : "rgba(142,165,168,0.2)",
+        fontSize: 11,
+        fontWeight: 600,
+      },
+    };
+  });
+
+  return { nodes, edges };
 }
 
 export default function NetworkPage() {
   const { apiKey } = useAnalysisAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [graph, setGraph] = useState({ nodes: [], edges: [] });
-  const [bankFilter, setBankFilter] = useState("");
-  const [riskFilter, setRiskFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState("");
   const [lastFetch, setLastFetch] = useState(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState(null);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const bankFilter = searchParams.get("bank") || "";
+  const riskFilter = searchParams.get("risk") || "";
+  const selectedAccount = searchParams.get("account") || "";
+
+  const updateSearchParams = useCallback(
+    (patch) => {
+      const next = new URLSearchParams(searchParams);
+      Object.entries(patch).forEach(([key, value]) => {
+        if (value) {
+          next.set(key, value);
+        } else {
+          next.delete(key);
+        }
+      });
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
 
   const loadGraph = useCallback(() => {
     setLoading(true);
@@ -277,11 +175,13 @@ export default function NetworkPage() {
     loadGraph();
   }, [loadGraph]);
 
-  useEffect(() => {
+  const filteredGraph = useMemo(() => {
     let filteredNodes = graph.nodes;
+
     if (bankFilter) {
       filteredNodes = filteredNodes.filter((node) => node.bank_code === bankFilter);
     }
+
     if (riskFilter) {
       filteredNodes = filteredNodes.filter((node) => node.risk === riskFilter);
     }
@@ -291,9 +191,95 @@ export default function NetworkPage() {
       (edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target),
     );
 
-    setNodes(layoutNodes(filteredNodes));
-    setEdges(buildEdges(filteredEdges));
-  }, [graph, bankFilter, riskFilter, setNodes, setEdges]);
+    return {
+      nodes: filteredNodes,
+      edges: filteredEdges,
+    };
+  }, [graph, bankFilter, riskFilter]);
+
+  useEffect(() => {
+    if (
+      selectedAccount &&
+      !filteredGraph.nodes.some((node) => node.id === selectedAccount)
+    ) {
+      updateSearchParams({ account: "" });
+    }
+  }, [selectedAccount, filteredGraph.nodes, updateSearchParams]);
+
+  useEffect(() => {
+    if (
+      selectedEdgeId &&
+      !filteredGraph.edges.some((edge, index) => getEdgeId(edge, index) === selectedEdgeId)
+    ) {
+      setSelectedEdgeId(null);
+    }
+  }, [filteredGraph.edges, selectedEdgeId]);
+
+  const { highlightNodeIds, highlightEdgeIds } = useMemo(() => {
+    if (!selectedAccount && !selectedEdgeId) {
+      return { highlightNodeIds: null, highlightEdgeIds: null };
+    }
+
+    const nodeIds = new Set();
+    const edgeIds = new Set();
+
+    if (selectedAccount) {
+      nodeIds.add(selectedAccount);
+      filteredGraph.edges.forEach((edge, index) => {
+        const edgeId = getEdgeId(edge, index);
+        if (edge.source === selectedAccount || edge.target === selectedAccount) {
+          edgeIds.add(edgeId);
+          nodeIds.add(edge.source);
+          nodeIds.add(edge.target);
+        }
+      });
+    }
+
+    if (selectedEdgeId) {
+      filteredGraph.edges.forEach((edge, index) => {
+        const edgeId = getEdgeId(edge, index);
+        if (edgeId === selectedEdgeId) {
+          edgeIds.add(edgeId);
+          nodeIds.add(edge.source);
+          nodeIds.add(edge.target);
+        }
+      });
+    }
+
+    return { highlightNodeIds: nodeIds, highlightEdgeIds: edgeIds };
+  }, [filteredGraph, selectedAccount, selectedEdgeId]);
+
+  const flowGraph = useMemo(
+    () => buildFlow(filteredGraph, highlightNodeIds, highlightEdgeIds),
+    [filteredGraph, highlightNodeIds, highlightEdgeIds],
+  );
+
+  const selectedNode = filteredGraph.nodes.find((node) => node.id === selectedAccount) || null;
+  const selectedConnections = filteredGraph.edges
+    .filter(
+      (edge) => edge.source === selectedAccount || edge.target === selectedAccount,
+    )
+    .slice()
+    .sort((left, right) => right.amount - left.amount)
+    .slice(0, 6);
+  const selectedEdge = filteredGraph.edges.find(
+    (edge, index) => getEdgeId(edge, index) === selectedEdgeId,
+  );
+
+  const bankOptions = useMemo(
+    () => [...new Set(graph.nodes.map((node) => node.bank_code))].sort(),
+    [graph.nodes],
+  );
+
+  const highCount = filteredGraph.nodes.filter((node) => node.risk === "high").length;
+  const medCount = filteredGraph.nodes.filter((node) => node.risk === "medium").length;
+  const lowCount = filteredGraph.nodes.filter((node) => node.risk === "low").length;
+  const totalVolume = filteredGraph.edges.reduce((sum, edge) => sum + edge.amount, 0);
+  const activeFilterTags = [
+    bankFilter ? `Banco: ${bankFilter}` : null,
+    riskFilter ? `Riesgo: ${riskFilter}` : null,
+    selectedAccount ? `Cuenta foco: ${selectedAccount}` : null,
+  ].filter(Boolean);
 
   const handleFetchTransactions = () => {
     setFetching(true);
@@ -304,14 +290,26 @@ export default function NetworkPage() {
       .finally(() => setFetching(false));
   };
 
-  const bankOptions = [...new Set(graph.nodes.map((node) => node.bank_code))].sort();
-  const highCount = graph.nodes.filter((node) => node.risk === "high").length;
-  const medCount = graph.nodes.filter((node) => node.risk === "medium").length;
-  const lowCount = graph.nodes.filter((node) => node.risk === "low").length;
-  const totalVolume = graph.edges.reduce((sum, edge) => sum + edge.amount, 0);
+  const onNodeClick = useCallback(
+    (_event, node) => {
+      setSelectedEdgeId(null);
+      updateSearchParams({
+        account: selectedAccount === node.id ? "" : node.id,
+      });
+    },
+    [selectedAccount, updateSearchParams],
+  );
 
-  const visibleNodes = nodes;
-  const visibleEdges = edges;
+  const onEdgeClick = useCallback((_event, edge) => {
+    setSelectedEdgeId((prev) => (prev === edge.id ? null : edge.id));
+  }, []);
+
+  const onPaneClick = useCallback(() => {
+    setSelectedEdgeId(null);
+    if (selectedAccount) {
+      updateSearchParams({ account: "" });
+    }
+  }, [selectedAccount, updateSearchParams]);
 
   return (
     <section className="page">
@@ -321,8 +319,8 @@ export default function NetworkPage() {
           <h2>Mapa de red transaccional</h2>
         </div>
         <p className="page-copy">
-          Vista agregada del ecosistema. Filtra por banco o nivel de riesgo y revisa
-          los clústeres circulares de transferencias.
+          Vista agregada del ecosistema. Filtra por banco o nivel de riesgo y usa el
+          foco por cuenta para seguir relaciones y saltar al follow-up.
         </p>
       </header>
 
@@ -331,19 +329,19 @@ export default function NetworkPage() {
       <div className="metric-grid">
         <article className="metric-card">
           <span>Nodos visibles</span>
-          <strong>{visibleNodes.length}</strong>
+          <strong>{filteredGraph.nodes.length}</strong>
         </article>
         <article className="metric-card">
-          <span>Volumen total</span>
+          <span>Enlaces visibles</span>
+          <strong>{filteredGraph.edges.length}</strong>
+        </article>
+        <article className="metric-card">
+          <span>Filtro activo</span>
+          <strong>{riskLabel(riskFilter)}</strong>
+        </article>
+        <article className="metric-card accent">
+          <span>Volumen visible</span>
           <strong>{formatCurrency(totalVolume)}</strong>
-        </article>
-        <article className="metric-card" style={{ borderColor: "rgba(255,122,89,0.3)" }}>
-          <span style={{ color: "#ff7a59" }}>⚠ Riesgo alto</span>
-          <strong style={{ color: "#ff7a59" }}>{highCount}</strong>
-        </article>
-        <article className="metric-card" style={{ borderColor: "rgba(247,193,74,0.3)" }}>
-          <span style={{ color: "#f7c14a" }}>◈ Riesgo medio</span>
-          <strong style={{ color: "#f7c14a" }}>{medCount}</strong>
         </article>
       </div>
 
@@ -352,14 +350,20 @@ export default function NetworkPage() {
           <h3>Filtros</h3>
           <span>
             {loading
-              ? "Cargando…"
-              : `${visibleNodes.length} nodos · ${visibleEdges.length} conexiones`}
+              ? "Cargando..."
+              : `${filteredGraph.nodes.length} nodos · ${filteredGraph.edges.length} enlaces`}
           </span>
         </div>
-        <div className="network-toolbar" style={{ gridTemplateColumns: "1fr 1fr 1fr auto auto" }}>
+        <div
+          className="network-toolbar"
+          style={{ gridTemplateColumns: "1fr 1fr 1fr auto auto" }}
+        >
           <label>
             Banco
-            <select value={bankFilter} onChange={(event) => setBankFilter(event.target.value)}>
+            <select
+              value={bankFilter}
+              onChange={(event) => updateSearchParams({ bank: event.target.value })}
+            >
               <option value="">Todos los bancos</option>
               {bankOptions.map((code) => (
                 <option key={code} value={code}>
@@ -370,21 +374,30 @@ export default function NetworkPage() {
           </label>
           <label>
             Riesgo
-            <select value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)}>
+            <select
+              value={riskFilter}
+              onChange={(event) => updateSearchParams({ risk: event.target.value })}
+            >
               <option value="">Todos los niveles</option>
               <option value="high">⚠ Alto</option>
               <option value="medium">◈ Medio</option>
               <option value="low">◉ Bajo</option>
             </select>
           </label>
-          <div />
+          <div className="active-filters" style={{ alignSelf: "end" }}>
+            {activeFilterTags.length ? (
+              activeFilterTags.map((tag) => <span key={tag} className="active-filter-tag">{tag}</span>)
+            ) : (
+              <span className="active-filter-tag">Sin filtros activos</span>
+            )}
+          </div>
           <button
             type="button"
             className="secondary-button"
             style={{ alignSelf: "end" }}
             onClick={() => {
-              setBankFilter("");
-              setRiskFilter("");
+              setSelectedEdgeId(null);
+              setSearchParams({}, { replace: true });
             }}
           >
             Limpiar
@@ -396,7 +409,7 @@ export default function NetworkPage() {
             onClick={handleFetchTransactions}
             disabled={fetching || loading}
           >
-            {fetching ? "Capturando…" : "⟳ Capturar transferencias"}
+            {fetching ? "Capturando..." : "⟳ Capturar transferencias"}
           </button>
         </div>
         {lastFetch ? (
@@ -411,12 +424,12 @@ export default function NetworkPage() {
           <button
             key={level}
             type="button"
-            onClick={() => setRiskFilter(riskFilter === level ? "" : level)}
+            onClick={() =>
+              updateSearchParams({ risk: riskFilter === level ? "" : level })
+            }
             className="network-chip"
             style={{
               border: `1px solid ${RISK_COLOR[level]}`,
-              background:
-                riskFilter === level ? RISK_BG[level] : "rgba(255,255,255,0.04)",
               color: RISK_COLOR[level],
               cursor: "pointer",
               fontWeight: riskFilter === level ? 700 : 400,
@@ -431,46 +444,175 @@ export default function NetworkPage() {
         ))}
       </div>
 
-      <article className="panel" style={{ padding: 0, overflow: "hidden" }}>
-        <div className="panel-header" style={{ padding: "18px 22px 0" }}>
-          <h3>Mapa de red</h3>
-          <span>{visibleEdges.length} conexiones · clústeres circulares por banco</span>
+      <article className="panel">
+        <div className="panel-header">
+          <h3>Graph view</h3>
+          <span>
+            {loading
+              ? "Actualizando..."
+              : `${flowGraph.nodes.length} nodos · ${flowGraph.edges.length} enlaces`}
+          </span>
         </div>
-        <div className="graph-canvas dark circular" style={{ height: 680, borderRadius: 0 }}>
-          {visibleNodes.length === 0 && !loading ? (
+
+        <div className="graph-legend">
+          <span>
+            <i className="legend-dot low" /> Low
+          </span>
+          <span>
+            <i className="legend-dot medium" /> Medium
+          </span>
+          <span>
+            <i className="legend-dot high" /> High
+          </span>
+        </div>
+
+        <div className="graph-canvas dark">
+          {flowGraph.nodes.length === 0 && !loading ? (
             <div
+              className="empty-state"
               style={{
                 height: "100%",
                 display: "grid",
                 placeItems: "center",
-                color: "#8ea5a8",
+                margin: 0,
+                borderRadius: 0,
               }}
             >
               No hay nodos que coincidan con los filtros seleccionados.
             </div>
           ) : (
             <ReactFlow
-              nodes={visibleNodes}
-              edges={visibleEdges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              nodeTypes={NODE_TYPES}
+              nodes={flowGraph.nodes}
+              edges={flowGraph.edges}
               fitView
-              fitViewOptions={{ padding: 0.16 }}
               nodesDraggable={false}
               nodesConnectable={false}
-              elementsSelectable={false}
+              elementsSelectable
+              onNodeClick={onNodeClick}
+              onEdgeClick={onEdgeClick}
+              onPaneClick={onPaneClick}
               proOptions={{ hideAttribution: true }}
             >
-              <MiniMap
-                nodeColor={(node) => RISK_COLOR[node.data?.risk] ?? "#3fd0b8"}
-                maskColor="rgba(7,19,22,0.7)"
-                style={{ background: "#0b1e24", border: "1px solid rgba(133,166,171,0.18)" }}
-              />
+              <MiniMap />
               <Controls />
+              <Background />
             </ReactFlow>
           )}
         </div>
+      </article>
+
+      <article className="panel">
+        <div className="panel-header">
+          <h3>Contexto seleccionado</h3>
+          <span>
+            {selectedNode
+              ? selectedNode.label
+              : selectedEdge
+                ? `${selectedEdge.source} → ${selectedEdge.target}`
+                : "Sin foco activo"}
+          </span>
+        </div>
+
+        {selectedNode ? (
+          <div className="context-grid">
+            <div className="context-card">
+              <small>Cuenta enfocada</small>
+              <strong className="mono">{selectedNode.label}</strong>
+              <p>
+                Banco {selectedNode.bank_code} · Riesgo {riskLabel(selectedNode.risk)} ·{" "}
+                {selectedNode.transaction_count} transacciones visibles.
+              </p>
+              <div className="panel-actions">
+                <Link
+                  className="inline-link-button"
+                  to={`/follow-up?account=${encodeURIComponent(selectedNode.label)}`}
+                >
+                  Abrir follow-up
+                </Link>
+                <Link
+                  className="inline-link-button"
+                  to={`/alerts?account=${encodeURIComponent(selectedNode.label)}`}
+                >
+                  Ver alertas de la cuenta
+                </Link>
+              </div>
+            </div>
+            <div className="context-card">
+              <small>Contrapartes visibles</small>
+              <div className="detail-list">
+                {selectedConnections.map((edge) => {
+                  const counterparty =
+                    edge.source === selectedNode.label ? edge.target : edge.source;
+                  return (
+                    <div key={`${selectedNode.label}-${counterparty}`} className="detail-item">
+                      <div>
+                        <p>{counterparty}</p>
+                        <span>{formatCurrency(edge.amount)} · {edge.count} tx</span>
+                      </div>
+                      <div className="detail-item-actions">
+                        <button
+                          type="button"
+                          className="inline-link-button"
+                          onClick={() => updateSearchParams({ account: counterparty })}
+                        >
+                          Enfocar
+                        </button>
+                        <Link
+                          className="inline-link-button"
+                          to={`/follow-up?account=${encodeURIComponent(counterparty)}`}
+                        >
+                          Follow-up
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+                {!selectedConnections.length ? (
+                  <p className="empty-state analytics-note">
+                    La cuenta no tiene conexiones visibles bajo los filtros actuales.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : selectedEdge ? (
+          <div className="context-grid">
+            <div className="context-card">
+              <small>Enlace seleccionado</small>
+              <strong className="mono">
+                {selectedEdge.source} → {selectedEdge.target}
+              </strong>
+              <p>
+                Flujo acumulado de {formatCurrency(selectedEdge.amount)} en {selectedEdge.count}{" "}
+                transacciones visibles.
+              </p>
+            </div>
+            <div className="context-card">
+              <small>Acciones rápidas</small>
+              <div className="panel-actions">
+                <button
+                  type="button"
+                  className="inline-link-button"
+                  onClick={() => updateSearchParams({ account: selectedEdge.source })}
+                >
+                  Enfocar origen
+                </button>
+                <button
+                  type="button"
+                  className="inline-link-button"
+                  onClick={() => updateSearchParams({ account: selectedEdge.target })}
+                >
+                  Enfocar destino
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="empty-state analytics-note">
+            Haz click en una cuenta o un enlace del grafo para fijar contexto y abrir
+            el siguiente paso de investigación.
+          </p>
+        )}
       </article>
 
       <div className="two-column-grid">
@@ -480,9 +622,7 @@ export default function NetworkPage() {
             <span>Top 12 por transacciones</span>
           </div>
           <div className="detail-list">
-            {graph.nodes
-              .filter((node) => !bankFilter || node.bank_code === bankFilter)
-              .filter((node) => !riskFilter || node.risk === riskFilter)
+            {filteredGraph.nodes
               .slice()
               .sort((left, right) => right.transaction_count - left.transaction_count)
               .slice(0, 12)
@@ -491,6 +631,21 @@ export default function NetworkPage() {
                   <div>
                     <p style={{ fontFamily: "monospace", fontSize: "0.9rem" }}>{node.label}</p>
                     <span>{node.bank_code}</span>
+                    <div className="detail-item-actions">
+                      <button
+                        type="button"
+                        className="inline-link-button"
+                        onClick={() => updateSearchParams({ account: node.label })}
+                      >
+                        Enfocar
+                      </button>
+                      <Link
+                        className="inline-link-button"
+                        to={`/follow-up?account=${encodeURIComponent(node.label)}`}
+                      >
+                        Follow-up
+                      </Link>
+                    </div>
                   </div>
                   <div className="detail-item-side">
                     <span
@@ -503,7 +658,7 @@ export default function NetworkPage() {
                   </div>
                 </div>
               ))}
-            {graph.nodes.length === 0 ? (
+            {filteredGraph.nodes.length === 0 ? (
               <p className="empty-state">No hay nodos para mostrar.</p>
             ) : null}
           </div>
@@ -521,57 +676,40 @@ export default function NetworkPage() {
                   <th>Origen</th>
                   <th>Destino</th>
                   <th>Monto</th>
-                  <th>Tx</th>
+                  <th>Transacciones</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {graph.edges
-                  .filter((edge) => {
-                    if (!bankFilter && !riskFilter) {
-                      return true;
-                    }
-                    const srcNode = graph.nodes.find((node) => node.id === edge.source);
-                    const dstNode = graph.nodes.find((node) => node.id === edge.target);
-                    const bankOk =
-                      !bankFilter ||
-                      srcNode?.bank_code === bankFilter ||
-                      dstNode?.bank_code === bankFilter;
-                    const riskOk =
-                      !riskFilter ||
-                      srcNode?.risk === riskFilter ||
-                      dstNode?.risk === riskFilter;
-                    return bankOk && riskOk;
-                  })
+                {filteredGraph.edges
                   .slice()
                   .sort((left, right) => right.amount - left.amount)
                   .slice(0, 12)
-                  .map((edge) => {
-                    const srcNode = graph.nodes.find((node) => node.id === edge.source);
-                    const isHigh = srcNode?.risk === "high";
-                    return (
-                      <tr key={`${edge.source}-${edge.target}`}>
-                        <td style={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
-                          {edge.source}
-                        </td>
-                        <td style={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
-                          {edge.target}
-                        </td>
-                        <td
-                          style={{
-                            color: isHigh ? "#ff7a59" : "inherit",
-                            fontWeight: isHigh ? 700 : 400,
-                          }}
-                        >
-                          {formatCurrency(edge.amount)}
-                        </td>
-                        <td>{edge.count}</td>
-                      </tr>
-                    );
-                  })}
+                  .map((edge, index) => (
+                    <tr key={`${edge.source}-${edge.target}-${index}`}>
+                      <td style={{ fontFamily: "monospace" }}>{edge.source}</td>
+                      <td style={{ fontFamily: "monospace" }}>{edge.target}</td>
+                      <td>{formatCurrency(edge.amount)}</td>
+                      <td>{edge.count}</td>
+                      <td>
+                        <div className="table-actions">
+                          <button
+                            type="button"
+                            className="inline-link-button"
+                            onClick={() => updateSearchParams({ account: edge.source })}
+                          >
+                            Enfocar origen
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
-            {graph.edges.length === 0 ? (
-              <p className="empty-state">No hay conexiones visibles.</p>
+            {filteredGraph.edges.length === 0 ? (
+              <p className="empty-state analytics-note">
+                No hay conexiones suficientes para mostrar.
+              </p>
             ) : null}
           </div>
         </article>
