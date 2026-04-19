@@ -81,4 +81,25 @@ void main() {
 
     expect(manager.entries, isEmpty);
   });
+
+  test('keeps only the latest keyboard draft snapshot when forced from IME',
+      () {
+    final manager = ContextManager(whitelist: WhitelistService(), capacity: 20);
+
+    manager.recordKeyboardDraft(
+      'hola',
+      force: true,
+      fallbackOriginApp: 'com.telegram.messenger',
+    );
+    manager.recordKeyboardDraft(
+      'hola tengo 15 años',
+      force: true,
+      fallbackOriginApp: 'com.telegram.messenger',
+    );
+
+    expect(manager.entries.length, 1);
+    expect(manager.entries.first.source, 'Keyboard Draft');
+    expect(manager.entries.first.payload, 'hola tengo 15 años');
+    expect(manager.entries.first.originApp, 'com.telegram.messenger');
+  });
 }

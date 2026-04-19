@@ -6,15 +6,21 @@ import android.provider.Settings
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import com.tensorflowkeyboard.app.capture.ContextChannels
+import com.tensorflowkeyboard.app.capture.ContextEventStreamHandler
+import com.tensorflowkeyboard.app.capture.ContextMethodChannelHandler
 import io.flutter.embedding.android.FlutterView
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 
 class KeyboardInputMethodService : InputMethodService(), KeyboardActionDelegate {
     private lateinit var flutterEngine: FlutterEngine
     private lateinit var channelHandler: KeyboardMethodChannelHandler
+    private lateinit var contextMethodHandler: ContextMethodChannelHandler
 
     private var inputRoot: FrameLayout? = null
     private var flutterView: FlutterView? = null
+    private var contextEventChannel: EventChannel? = null
     private var secureModeEnabled = false
 
     override fun onCreate() {
@@ -25,6 +31,17 @@ class KeyboardInputMethodService : InputMethodService(), KeyboardActionDelegate 
             binaryMessenger = flutterEngine.dartExecutor.binaryMessenger,
         )
         channelHandler.bind()
+        contextMethodHandler = ContextMethodChannelHandler(
+            context = this,
+            binaryMessenger = flutterEngine.dartExecutor.binaryMessenger,
+        )
+        contextMethodHandler.bind()
+        contextEventChannel = EventChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            ContextChannels.EVENT_CHANNEL,
+        ).also { channel ->
+            channel.setStreamHandler(ContextEventStreamHandler())
+        }
     }
 
     override fun onCreateInputView(): View {
@@ -69,6 +86,9 @@ class KeyboardInputMethodService : InputMethodService(), KeyboardActionDelegate 
     override fun onDestroy() {
         detachFlutterUi()
         channelHandler.unbind()
+        contextMethodHandler.unbind()
+        contextEventChannel?.setStreamHandler(null)
+        contextEventChannel = null
         super.onDestroy()
     }
 

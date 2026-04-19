@@ -10,9 +10,11 @@ class KeyboardScreen extends StatefulWidget {
   const KeyboardScreen({
     super.key,
     this.controller,
+    this.imeOnly = false,
   });
 
   final KeyboardController? controller;
+  final bool imeOnly;
 
   @override
   State<KeyboardScreen> createState() => _KeyboardScreenState();
@@ -61,6 +63,35 @@ class _KeyboardScreenState extends State<KeyboardScreen>
         if (!_controller.reportFormVisible &&
             _reportCommentController.text.isNotEmpty) {
           _reportCommentController.clear();
+        }
+
+        if (widget.imeOnly || _controller.hostMode == 'ime') {
+          return Material(
+            color: const Color(0xFFF6F2E9),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    if (_controller.hasRiskAlert) ...<Widget>[
+                      _ImeRiskBanner(controller: _controller),
+                      const SizedBox(height: 10),
+                    ],
+                    if (_controller.reportFormVisible) ...<Widget>[
+                      _InlineReportComposer(
+                        controller: _controller,
+                        reportCommentController: _reportCommentController,
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    QwertyKeyboard(controller: _controller),
+                  ],
+                ),
+              ),
+            ),
+          );
         }
 
         return Scaffold(
@@ -128,6 +159,64 @@ class _KeyboardScreenState extends State<KeyboardScreen>
           ),
         );
       },
+    );
+  }
+}
+
+class _ImeRiskBanner extends StatelessWidget {
+  const _ImeRiskBanner({required this.controller});
+
+  final KeyboardController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final assessment = controller.riskAssessment;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF8D1F1F),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: <Widget>[
+          const Icon(Icons.warning_amber_rounded, color: Colors.white),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  assessment.notificationTitle,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  controller.alertDeliveryStatus,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white70,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          FilledButton(
+            onPressed: controller.showReportForm,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFF2D4D4),
+              foregroundColor: const Color(0xFF6A1010),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+            child: const Text('Ver'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -787,6 +876,106 @@ class _FloatingReportComposer extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineReportComposer extends StatelessWidget {
+  const _InlineReportComposer({
+    required this.controller,
+    required this.reportCommentController,
+  });
+
+  final KeyboardController controller;
+  final TextEditingController reportCommentController;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(22),
+      color: const Color(0xFFFEFBF6),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFD9CCB5)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    controller.riskAssessment.notificationTitle,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: controller.hideReportForm,
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            Text(
+              'Denuncia local simulada. No sale del dispositivo.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF625E57),
+                  ),
+            ),
+            const SizedBox(height: 10),
+            CheckboxListTile(
+              value: controller.reportIntentConfirmed,
+              onChanged: (value) =>
+                  controller.setReportIntentConfirmed(value ?? false),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Confirmar'),
+              subtitle: const Text(
+                'Guardar denuncia local a partir del texto escrito.',
+              ),
+            ),
+            if (controller.reportIntentConfirmed) ...<Widget>[
+              const SizedBox(height: 10),
+              TextField(
+                controller: reportCommentController,
+                minLines: 2,
+                maxLines: 3,
+                onChanged: controller.updateReportComment,
+                decoration: const InputDecoration(
+                  labelText: 'Comentario rápido',
+                  hintText: 'Ej. Me pidió OTP y edad.',
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: <Widget>[
+                  OutlinedButton(
+                    onPressed: controller.hideReportForm,
+                    child: const Text('Cancelar'),
+                  ),
+                  const Spacer(),
+                  FilledButton(
+                    onPressed: controller.canSubmitReport
+                        ? controller.sendRiskAlert
+                        : null,
+                    child: Text(
+                      controller.sendingAlert
+                          ? 'Guardando...'
+                          : 'Guardar local',
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
         ),
       ),
     );

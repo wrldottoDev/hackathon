@@ -11,6 +11,7 @@ class QwertyKeyboard extends StatelessWidget {
   final KeyboardController controller;
 
   static const List<List<String>> _rows = <List<String>>[
+    <String>['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
     <String>['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
     <String>['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
     <String>['Z', 'X', 'C', 'V', 'B', 'N', 'M'],
@@ -83,13 +84,18 @@ class _KeyRow extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: _LetterKey(
                   label: key,
-                  onTap: () => onTap(key.toLowerCase()),
+                  onTap: () => onTap(_wireValueForKey(key)),
                 ),
               ),
             ),
           )
           .toList(),
     );
+  }
+
+  String _wireValueForKey(String key) {
+    final isDigit = RegExp(r'^\d$').hasMatch(key);
+    return isDigit ? key : key.toLowerCase();
   }
 }
 

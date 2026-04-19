@@ -41,7 +41,7 @@ class KeyboardApp extends StatelessWidget {
       ),
       home: mode == KeyboardAppMode.application
           ? const AppBootstrapScreen()
-          : const KeyboardScreen(),
+          : const KeyboardScreen(imeOnly: true),
     );
   }
 }

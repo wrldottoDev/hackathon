@@ -21,6 +21,7 @@ class ContextManager extends ChangeNotifier {
   final int capacity;
   final Duration _retentionWindow;
   final ListQueue<TelemetryEntry> _entries = ListQueue<TelemetryEntry>();
+  static const String _keyboardDraftSource = 'Keyboard Draft';
 
   Timer? _purgeTimer;
   String? _activeAppPackage;
@@ -49,14 +50,36 @@ class ContextManager extends ChangeNotifier {
     _activeAppPackage = packageName;
     _surveillanceEnabled = surveillance;
 
-    if (appLostFocus || !_surveillanceEnabled) {
+    if (appLostFocus && packageName == null) {
       purge(reason: 'Foco perdido o app fuera de vigilancia.');
       return;
     }
 
+    final appLabel = item.metadata['appLabel'] ?? packageName;
     _status = surveillance
-        ? 'Vigilancia local activa en ${item.metadata['appLabel'] ?? packageName}.'
-        : 'Vigilancia local inactiva.';
+        ? 'Vigilancia local activa en $appLabel.'
+        : 'Teclado activo en $appLabel. Revisión por texto local habilitada.';
+    notifyListeners();
+  }
+
+  void synchronizeHostState({
+    required String? activeAppPackage,
+    required bool surveillanceEnabled,
+    String? appLabel,
+  }) {
+    _activeAppPackage = activeAppPackage;
+    _surveillanceEnabled = surveillanceEnabled;
+
+    if (activeAppPackage == null) {
+      _status = 'Esperando app activa para iniciar revisión local.';
+      notifyListeners();
+      return;
+    }
+
+    final visibleLabel = appLabel ?? activeAppPackage;
+    _status = surveillanceEnabled
+        ? 'Vigilancia local activa en $visibleLabel.'
+        : 'Teclado activo en $visibleLabel. Revisión por texto local habilitada.';
     notifyListeners();
   }
 
@@ -91,11 +114,30 @@ class ContextManager extends ChangeNotifier {
     );
   }
 
+  bool recordKeyboardDraft(
+    String text, {
+    bool force = false,
+    String? fallbackOriginApp,
+  }) {
+    return _record(
+      source: _keyboardDraftSource,
+      payload: text,
+      force: force,
+      fallbackOriginApp: fallbackOriginApp,
+      replaceExistingSource: _keyboardDraftSource,
+    );
+  }
+
   bool recordSpeechInput(String text) {
     return _record(
       source: 'Speech To Text',
       payload: text,
     );
+  }
+
+  void clearKeyboardDraft() {
+    _entries.removeWhere((entry) => entry.source == _keyboardDraftSource);
+    notifyListeners();
   }
 
   void handleAppLifecycleChange(AppLifecycleState state) {
@@ -117,9 +159,16 @@ class ContextManager extends ChangeNotifier {
   bool _record({
     required String source,
     required String payload,
+    bool force = false,
+    String? fallbackOriginApp,
+    String? replaceExistingSource,
   }) {
     final trimmed = payload.trim();
     if (trimmed.isEmpty) {
+      if (replaceExistingSource != null) {
+        _entries.removeWhere((entry) => entry.source == replaceExistingSource);
+        notifyListeners();
+      }
       return false;
     }
 
@@ -129,10 +178,15 @@ class ContextManager extends ChangeNotifier {
       return false;
     }
 
-    if (!_surveillanceEnabled || _activeAppPackage == null) {
+    final originApp = _activeAppPackage ?? fallbackOriginApp;
+    if (!force && (!_surveillanceEnabled || originApp == null)) {
       _status = 'Vigilancia inactiva. Evento no agregado.';
       notifyListeners();
       return false;
+    }
+
+    if (replaceExistingSource != null) {
+      _entries.removeWhere((entry) => entry.source == replaceExistingSource);
     }
 
     // Privacy boundary:
@@ -144,7 +198,7 @@ class ContextManager extends ChangeNotifier {
     _entries.addLast(
       TelemetryEntry(
         source: source,
-        originApp: _activeAppPackage!,
+        originApp: originApp ?? 'ime.local',
         payload: trimmed,
         timestamp: DateTime.now(),
       ),

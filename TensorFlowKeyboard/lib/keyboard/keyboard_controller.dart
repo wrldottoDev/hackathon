@@ -128,6 +128,11 @@ class KeyboardController extends ChangeNotifier {
     await _notificationService.initialize();
     await _nativeContextBridge.start();
     _contextSummary = await _nativeContextBridge.getSummary();
+    contextManager.synchronizeHostState(
+      activeAppPackage: _resolveOriginApp(),
+      surveillanceEnabled: _contextSummary['surveillanceActive'] == true,
+      appLabel: _resolveOriginApp(),
+    );
     await speechBridge.initialize();
     unawaited(_textClassifier.initialize());
     notifyListeners();
@@ -135,18 +140,24 @@ class KeyboardController extends ChangeNotifier {
 
   Future<void> refreshContextSummary() async {
     _contextSummary = await _nativeContextBridge.getSummary();
+    contextManager.synchronizeHostState(
+      activeAppPackage: _resolveOriginApp(),
+      surveillanceEnabled: _contextSummary['surveillanceActive'] == true,
+      appLabel: _resolveOriginApp(),
+    );
     notifyListeners();
   }
 
   Future<void> insertText(String value) async {
     _draftPreview += value;
-    contextManager.recordKeyboardInput(value);
+    _refreshKeyboardTelemetry();
     notifyListeners();
     await _methodChannel.commitText(value);
   }
 
   Future<void> insertSpace() async {
     _draftPreview += ' ';
+    _refreshKeyboardTelemetry();
     notifyListeners();
     await _methodChannel.commitText(' ');
   }
@@ -154,13 +165,16 @@ class KeyboardController extends ChangeNotifier {
   Future<void> backspace() async {
     if (_draftPreview.isNotEmpty) {
       _draftPreview = _draftPreview.substring(0, _draftPreview.length - 1);
+      _refreshKeyboardTelemetry();
       notifyListeners();
     }
     await _methodChannel.backspace();
   }
 
   Future<void> insertNewLine() async {
+    _refreshKeyboardTelemetry();
     _draftPreview = '';
+    contextManager.clearKeyboardDraft();
     notifyListeners();
     await _methodChannel.enter();
   }
@@ -232,7 +246,9 @@ class KeyboardController extends ChangeNotifier {
   }
 
   void clearContextBuffer() {
+    _draftPreview = '';
     _resetAlertUi(cancelNotification: true);
+    contextManager.clearKeyboardDraft();
     contextManager.purge(reason: 'Limpieza manual.');
   }
 
@@ -292,11 +308,18 @@ class KeyboardController extends ChangeNotifier {
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
+      _draftPreview = '';
+      contextManager.clearKeyboardDraft();
       _resetAlertUi(cancelNotification: true);
     }
   }
 
   void _handleContextChanged() {
+    _contextSummary = <String, dynamic>{
+      ..._contextSummary,
+      'activeAppPackage': contextManager.activeAppPackage,
+      'surveillanceActive': contextManager.surveillanceEnabled,
+    };
     notifyListeners();
     _scheduleRiskAnalysis();
   }
@@ -409,6 +432,19 @@ class KeyboardController extends ChangeNotifier {
       trustedContacts.dispose();
     }
     dispose();
+  }
+
+  void _refreshKeyboardTelemetry() {
+    contextManager.recordKeyboardDraft(
+      _draftPreview,
+      force: _hostMode == 'ime',
+      fallbackOriginApp: _resolveOriginApp(),
+    );
+  }
+
+  String? _resolveOriginApp() {
+    return contextManager.activeAppPackage ??
+        _contextSummary['activeAppPackage']?.toString();
   }
 
   String _buildLocalReceiptMarker(
