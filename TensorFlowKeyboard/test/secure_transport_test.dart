@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:tensorflow_keyboard/keyboard/network/secure_alert_models.dart';
 import 'package:tensorflow_keyboard/keyboard/network/secure_transport.dart';
+import 'package:tensorflow_keyboard/keyboard/network/secure_transport_settings_store.dart';
 
 const String _publicKeyPem = '''
 -----BEGIN PUBLIC KEY-----
@@ -81,5 +82,65 @@ void main() {
     expect(receipt.id, 41);
     expect(receipt.hashDenuncia, 'abc123');
     expect(receipt.estadoInvestigacion, 'pendiente');
+  });
+
+  test('uses runtime transport settings overrides', () async {
+    final client = MockClient((request) async {
+      expect(
+        request.url.toString(),
+        'https://analytics.vps.example.com/api/v1/alertas',
+      );
+      expect(
+        request.headers['X-SGT-Tag'],
+        'CONATT-VPS-ENTRY',
+      );
+
+      return http.Response(
+        jsonEncode(<String, dynamic>{
+          'id': 99,
+          'hash_denuncia': 'xyz999',
+          'recibo_inmutabilidad': 'xyz999',
+          'timestamp': '2026-04-19T10:00:00Z',
+          'estado_investigacion': 'pendiente',
+        }),
+        201,
+        headers: const <String, String>{
+          'content-type': 'application/json',
+        },
+      );
+    });
+
+    final transport = SecureTransport(
+      httpClient: client,
+      publicKeyLoader: () async => _publicKeyPem,
+      settingsLoader: () async => const SecureTransportSettings(
+        baseUrl: 'https://analytics.vps.example.com',
+        sgtTag: 'CONATT-VPS-ENTRY',
+      ),
+    );
+
+    final receipt = await transport.sendAlert(
+      SecureAlertReport(
+        riskProbability: 0.88,
+        bufferEntries: <SecureAlertBufferEntry>[
+          SecureAlertBufferEntry(
+            source: 'Keyboard',
+            originApp: 'com.telegram',
+            payload: 'mensaje de prueba',
+            timestamp: DateTime.utc(2026, 4, 19, 10),
+          ),
+        ],
+        metadata: const <String, dynamic>{
+          'host_mode': 'preview',
+          'secure_mode': true,
+        },
+        extractedEntities: const <String>['prueba'],
+        originApp: 'com.telegram',
+        createdAt: DateTime.utc(2026, 4, 19, 10),
+      ),
+    );
+
+    expect(receipt.id, 99);
+    expect(receipt.hashDenuncia, 'xyz999');
   });
 }

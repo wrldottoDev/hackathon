@@ -1,0 +1,346 @@
+# ═══════════════════════════════════════════════════════════════
+# Sentinel-Link / FlowLens — Production Docker Compose
+# ═══════════════════════════════════════════════════════════════
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml logs -f nginx
+#   docker compose -f docker-compose.prod.yml down
+# ═══════════════════════════════════════════════════════════════
+
+services:
+
+  # ─── Nginx Reverse Proxy ──────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: flowlens-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./landing.html:/usr/share/nginx/html/landing/landing.html:ro
+      - certbot-etc:/etc/letsencrypt:ro
+      - certbot-var:/var/www/certbot:ro
+    depends_on:
+      - api_banco_a
+      - api_banco_b
+      - api_banco_c
+      - api_analytics
+      - api_finsta
+      - api_safecall
+      - ui_banco_a
+      - ui_banco_b
+      - ui_banco_c
+      - ui_analytics
+      - ui_finsta
+      - ui_safecall
+    restart: unless-stopped
+    networks:
+      - flowlens-network
+
+  # ─── Certbot (SSL) ────────────────────────────────────────
+  certbot:
+    image: certbot/certbot
+    container_name: flowlens-certbot
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do sleep 12h & wait $${!}; certbot renew --quiet; done'"
+    networks:
+      - flowlens-network
+
+  # ─── PostgreSQL ──────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: flowlens-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: flowlens
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+    networks:
+      - flowlens-network
+
+  # ═══════════════════════════════════════════════════════════
+  # BACKENDS (no ports exposed — nginx handles routing)
+  # ═══════════════════════════════════════════════════════════
+
+  api_banco_a:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      args:
+        SERVICE_DIR: banco_a
+        PORT: 8001
+    container_name: flowlens-api-banco-a
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/flowlens_banco_a
+      BANK_ID: banco_a
+      BANK_NAME: Banco A
+      BANK_CODE: BKA
+      BANK_SECRET_KEY: ${BANCO_A_SECRET_KEY}
+      BANK_PUBLIC_API_URL: http://api_banco_a:8001
+      FLOWLENS_SERVICE_TOKEN: ${FLOWLENS_SERVICE_TOKEN}
+      FLOWLENS_ANALYTICS_API_KEY: ${FLOWLENS_ANALYTICS_API_KEY}
+      FLOWLENS_BANK_REGISTRY: "BKA=http://api_banco_a:8001,BKB=http://api_banco_b:8002,BKC=http://api_banco_c:8004"
+      BANK_ALLOWED_ORIGINS: "https://bancoa.lynqcr.com,https://bancob.lynqcr.com,https://bancoc.lynqcr.com,https://analytics.lynqcr.com,http://bancoa.lynqcr.com,http://bancob.lynqcr.com,http://bancoc.lynqcr.com,http://analytics.lynqcr.com"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - flowlens-network
+
+  api_banco_b:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      args:
+        SERVICE_DIR: banco_b
+        PORT: 8002
+    container_name: flowlens-api-banco-b
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/flowlens_banco_b
+      BANK_ID: banco_b
+      BANK_NAME: Banco B
+      BANK_CODE: BKB
+      BANK_SECRET_KEY: ${BANCO_B_SECRET_KEY}
+      BANK_PUBLIC_API_URL: http://api_banco_b:8002
+      FLOWLENS_SERVICE_TOKEN: ${FLOWLENS_SERVICE_TOKEN}
+      FLOWLENS_ANALYTICS_API_KEY: ${FLOWLENS_ANALYTICS_API_KEY}
+      FLOWLENS_BANK_REGISTRY: "BKA=http://api_banco_a:8001,BKB=http://api_banco_b:8002,BKC=http://api_banco_c:8004"
+      BANK_ALLOWED_ORIGINS: "https://bancoa.lynqcr.com,https://bancob.lynqcr.com,https://bancoc.lynqcr.com,https://analytics.lynqcr.com,http://bancoa.lynqcr.com,http://bancob.lynqcr.com,http://bancoc.lynqcr.com,http://analytics.lynqcr.com"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - flowlens-network
+
+  api_banco_c:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      args:
+        SERVICE_DIR: banco_c
+        PORT: 8004
+    container_name: flowlens-api-banco-c
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/flowlens_banco_c
+      BANK_ID: banco_c
+      BANK_NAME: Banco C
+      BANK_CODE: BKC
+      BANK_SECRET_KEY: ${BANCO_C_SECRET_KEY}
+      BANK_PUBLIC_API_URL: http://api_banco_c:8004
+      FLOWLENS_SERVICE_TOKEN: ${FLOWLENS_SERVICE_TOKEN}
+      FLOWLENS_ANALYTICS_API_KEY: ${FLOWLENS_ANALYTICS_API_KEY}
+      FLOWLENS_BANK_REGISTRY: "BKA=http://api_banco_a:8001,BKB=http://api_banco_b:8002,BKC=http://api_banco_c:8004"
+      BANK_ALLOWED_ORIGINS: "https://bancoa.lynqcr.com,https://bancob.lynqcr.com,https://bancoc.lynqcr.com,https://analytics.lynqcr.com,http://bancoa.lynqcr.com,http://bancob.lynqcr.com,http://bancoc.lynqcr.com,http://analytics.lynqcr.com"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - flowlens-network
+
+  api_analytics:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      args:
+        SERVICE_DIR: analytics
+        PORT: 8003
+    container_name: flowlens-api-analytics
+    env_file:
+      - ./analytics/.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/flowlens_analytics
+      FLOWLENS_ANALYTICS_API_KEY: ${FLOWLENS_ANALYTICS_API_KEY}
+      FLOWLENS_SERVICE_TOKEN: ${FLOWLENS_SERVICE_TOKEN}
+      ANALYTICS_ALLOWED_ORIGINS: "https://analytics.lynqcr.com,https://bancoa.lynqcr.com,https://bancob.lynqcr.com,https://bancoc.lynqcr.com,http://analytics.lynqcr.com,http://bancoa.lynqcr.com,http://bancob.lynqcr.com,http://bancoc.lynqcr.com"
+      SECURE_ALERTS_ALLOWED_IPS: "127.0.0.1,::1,::ffff:127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,0.0.0.0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - flowlens-network
+
+  api_finsta:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      args:
+        SERVICE_DIR: finsta
+        PORT: 8005
+    container_name: flowlens-api-finsta
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/flowlens_finsta
+      FLOWLENS_FINSTA_API_KEY: ${FLOWLENS_FINSTA_API_KEY}
+      FLOWLENS_ANALYTICS_API_KEY: ${FLOWLENS_ANALYTICS_API_KEY}
+      ANALYTICS_API_URL: http://api_analytics:8003
+      FINSTA_ALLOWED_ORIGINS: "https://finsta.lynqcr.com,http://finsta.lynqcr.com"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - flowlens-network
+
+  api_safecall:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      args:
+        SERVICE_DIR: safecall
+        PORT: 8006
+    container_name: flowlens-api-safecall
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/flowlens_safecall
+      FLOWLENS_SAFECALL_API_KEY: ${FLOWLENS_SAFECALL_API_KEY}
+      FLOWLENS_ANALYTICS_API_KEY: ${FLOWLENS_ANALYTICS_API_KEY}
+      ANALYTICS_API_URL: http://api_analytics:8003
+      SAFECALL_ALLOWED_ORIGINS: "https://safecall.lynqcr.com,http://safecall.lynqcr.com"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - flowlens-network
+
+  # ═══════════════════════════════════════════════════════════
+  # FRONTENDS (no ports exposed — nginx handles routing)
+  # ═══════════════════════════════════════════════════════════
+
+  ui_banco_a:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        SERVICE_DIR: banco_a
+        PORT: 5173
+    container_name: flowlens-ui-banco-a
+    environment:
+      VITE_API_URL: ""
+      VITE_BANK_ID: banco_a
+      VITE_BANK_NAME: Banco A
+      VITE_BANK_CODE: BKA
+    depends_on:
+      - api_banco_a
+    restart: unless-stopped
+    networks:
+      - flowlens-network
+
+  ui_banco_b:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        SERVICE_DIR: banco_b
+        PORT: 5174
+    container_name: flowlens-ui-banco-b
+    environment:
+      VITE_API_URL: ""
+      VITE_BANK_ID: banco_b
+      VITE_BANK_NAME: Banco B
+      VITE_BANK_CODE: BKB
+    depends_on:
+      - api_banco_b
+    restart: unless-stopped
+    networks:
+      - flowlens-network
+
+  ui_banco_c:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        SERVICE_DIR: banco_c
+        PORT: 5176
+    container_name: flowlens-ui-banco-c
+    environment:
+      VITE_API_URL: ""
+      VITE_BANK_ID: banco_c
+      VITE_BANK_NAME: Banco C
+      VITE_BANK_CODE: BKC
+    depends_on:
+      - api_banco_c
+    restart: unless-stopped
+    networks:
+      - flowlens-network
+
+  ui_analytics:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        SERVICE_DIR: analytics
+        PORT: 5175
+    container_name: flowlens-ui-analytics
+    environment:
+      VITE_ANALYTICS_API_URL: ""
+      VITE_ANALYTICS_API_KEY: ${FLOWLENS_ANALYTICS_API_KEY}
+      VITE_BANK_A_API_URL: https://bancoa.lynqcr.com
+      VITE_BANK_B_API_URL: https://bancob.lynqcr.com
+      VITE_BANK_C_API_URL: https://bancoc.lynqcr.com
+    depends_on:
+      - api_analytics
+    restart: unless-stopped
+    networks:
+      - flowlens-network
+
+  ui_finsta:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        SERVICE_DIR: finsta
+        PORT: 5177
+    container_name: flowlens-ui-finsta
+    environment:
+      VITE_API_URL: ""
+    depends_on:
+      - api_finsta
+    restart: unless-stopped
+    networks:
+      - flowlens-network
+
+  ui_safecall:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        SERVICE_DIR: safecall
+        PORT: 5178
+    container_name: flowlens-ui-safecall
+    environment:
+      VITE_API_URL: ""
+    depends_on:
+      - api_safecall
+    restart: unless-stopped
+    networks:
+      - flowlens-network
+
+# ═══════════════════════════════════════════════════════════
+# INFRASTRUCTURE
+# ═══════════════════════════════════════════════════════════
+
+volumes:
+  pgdata:
+    driver: local
+  certbot-etc:
+    driver: local
+  certbot-var:
+    driver: local
+
+networks:
+  flowlens-network:
+    driver: bridge

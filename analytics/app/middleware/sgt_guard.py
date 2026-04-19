@@ -13,6 +13,7 @@ class SGTGuardMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self._protected_prefix = protected_prefix
         self._allowed_ips = set(SECURE_ALERTS_ALLOWED_IPS)
+        self._skip_ip_check = "0.0.0.0" in self._allowed_ips
 
     async def dispatch(self, request: Request, call_next) -> Response:
         if not request.url.path.startswith(self._protected_prefix):
@@ -23,7 +24,8 @@ class SGTGuardMiddleware(BaseHTTPMiddleware):
 
         client_ip = _extract_client_ip(request)
         sgt_tag = request.headers.get("X-SGT-Tag")
-        if sgt_tag != SECURE_ALERTS_SGT_TAG or client_ip not in self._allowed_ips:
+        ip_ok = self._skip_ip_check or client_ip in self._allowed_ips
+        if sgt_tag != SECURE_ALERTS_SGT_TAG or not ip_ok:
             return JSONResponse(
                 status_code=403,
                 content={"detail": "Solicitud bloqueada por politica de seguridad."},

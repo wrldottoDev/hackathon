@@ -11,6 +11,7 @@ COPY ${SERVICE_DIR}/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ${SERVICE_DIR}/ ./${SERVICE_DIR}/
+COPY seed_analytics_full.py seed_resolved_case.py* ./
 
 ARG PORT=8000
 ENV PORT=${PORT}

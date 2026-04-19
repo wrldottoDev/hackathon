@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:basic_utils/basic_utils.dart';
@@ -8,8 +10,11 @@ import 'package:http/http.dart' as http;
 import 'package:pointycastle/export.dart';
 
 import 'secure_alert_models.dart';
+import 'secure_transport_settings_store.dart';
 
 typedef PublicKeyLoader = Future<String> Function();
+typedef SecureTransportSettingsLoader = Future<SecureTransportSettings>
+    Function();
 
 class SecureTransportException implements Exception {
   const SecureTransportException(this.message);
@@ -24,12 +29,16 @@ class SecureTransport {
   SecureTransport({
     http.Client? httpClient,
     Uri? baseUri,
-    this.sgtTag = _defaultSgtTag,
+    String? sgtTag,
     PublicKeyLoader? publicKeyLoader,
+    SecureTransportSettingsLoader? settingsLoader,
   })  : _httpClient = httpClient ?? http.Client(),
         _ownsHttpClient = httpClient == null,
         _baseUri = baseUri ?? _defaultBaseUri,
-        _publicKeyLoader = publicKeyLoader ?? _loadBundledPublicKey;
+        sgtTag = sgtTag ?? _defaultSgtTag,
+        _publicKeyLoader = publicKeyLoader ?? _loadBundledPublicKey,
+        _settingsLoader =
+            settingsLoader ?? SecureTransportSettingsStore.instance.load;
 
   static const String _defaultSgtTag = 'CONATT-SECURE-ENTRY';
   static const String _defaultPublicKeyAsset =
@@ -37,31 +46,57 @@ class SecureTransport {
   static final Uri _defaultBaseUri = Uri.parse(
     const String.fromEnvironment(
       'SECURE_ALERTS_BASE_URL',
-      defaultValue: 'http://127.0.0.1:8003',
+      defaultValue: 'https://analytics.lynqcr.com',
     ),
   );
+  static const Duration _requestTimeout = Duration(seconds: 15);
 
   final http.Client _httpClient;
   final bool _ownsHttpClient;
   final Uri _baseUri;
   final String sgtTag;
   final PublicKeyLoader _publicKeyLoader;
+  final SecureTransportSettingsLoader _settingsLoader;
   final AesGcm _aesGcm = AesGcm.with256bits();
+
+  static Uri get defaultBaseUri => _defaultBaseUri;
+  static String get defaultSgtTag => _defaultSgtTag;
 
   Future<SecureAlertReceipt> sendAlert(SecureAlertReport report) async {
     final envelope = await buildEncryptedEnvelope(report);
-    final response = await _httpClient.post(
-      _baseUri.resolve('/api/v1/alertas'),
-      headers: <String, String>{
-        'Content-Type': 'application/json',
-        'X-SGT-Tag': sgtTag,
-      },
-      body: jsonEncode(envelope),
-    );
+    final settings = await _settingsLoader();
+    final endpoint = _resolveBaseUri(settings);
+    final activeSgtTag = _resolveSgtTag(settings);
+    late final http.Response response;
+
+    try {
+      response = await _httpClient
+          .post(
+            endpoint.resolve('/api/v1/alertas'),
+            headers: <String, String>{
+              'Content-Type': 'application/json',
+              'X-SGT-Tag': activeSgtTag,
+            },
+            body: jsonEncode(envelope),
+          )
+          .timeout(_requestTimeout);
+    } on TimeoutException {
+      throw const SecureTransportException(
+        'Tiempo de espera agotado al contactar el servidor de alertas.',
+      );
+    } on SocketException {
+      throw const SecureTransportException(
+        'No se pudo conectar con el servidor de alertas. Verifica la URL y la conectividad.',
+      );
+    } on http.ClientException {
+      throw const SecureTransportException(
+        'La conexión con el servidor de alertas falló. Revisa la URL configurada y el certificado HTTPS.',
+      );
+    }
 
     if (response.statusCode != 201) {
-      throw const SecureTransportException(
-        'No se pudo entregar la alerta cifrada.',
+      throw SecureTransportException(
+        _buildFailureMessage(response),
       );
     }
 
@@ -105,6 +140,51 @@ class SecureTransport {
     if (_ownsHttpClient) {
       _httpClient.close();
     }
+  }
+
+  Uri _resolveBaseUri(SecureTransportSettings settings) {
+    final configuredBaseUrl = settings.baseUrl;
+    if (configuredBaseUrl == null || configuredBaseUrl.isEmpty) {
+      return _baseUri;
+    }
+
+    final parsedUri = Uri.tryParse(configuredBaseUrl);
+    if (parsedUri == null || !parsedUri.hasAuthority) {
+      throw const SecureTransportException(
+        'La URL configurada para el servidor de alertas no es válida.',
+      );
+    }
+    return parsedUri;
+  }
+
+  String _resolveSgtTag(SecureTransportSettings settings) {
+    final configuredTag = settings.sgtTag;
+    if (configuredTag == null || configuredTag.isEmpty) {
+      return sgtTag;
+    }
+    return configuredTag;
+  }
+
+  String _buildFailureMessage(http.Response response) {
+    final genericMessage =
+        'No se pudo entregar la alerta cifrada. Servidor respondió ${response.statusCode}.';
+    if (response.body.trim().isEmpty) {
+      return genericMessage;
+    }
+
+    try {
+      final payload = jsonDecode(response.body);
+      if (payload is Map<String, dynamic>) {
+        final detail = payload['detail']?.toString().trim();
+        if (detail != null && detail.isNotEmpty) {
+          return '$genericMessage $detail';
+        }
+      }
+    } catch (_) {
+      // The backend may return plain text or HTML on infra failures.
+    }
+
+    return genericMessage;
   }
 
   Uint8List _encryptSessionKey(Uint8List sessionKey, RSAPublicKey publicKey) {
