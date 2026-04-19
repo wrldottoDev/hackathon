@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+}
+
+@layer components {
+  .gradient-border {
+    background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+    padding: 2px;
+    border-radius: 50%;
+  }
+
+  .gradient-text {
+    background: linear-gradient(45deg, #405de6, #833ab4, #e1306c, #f77737, #fcaf45);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .danger-glow {
+    box-shadow: 0 0 20px rgba(225, 48, 108, 0.3);
+  }
+}

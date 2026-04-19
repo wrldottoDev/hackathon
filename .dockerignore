@@ -1,0 +1,15 @@
+__pycache__
+*.pyc
+*.pyo
+.venv
+hackathon
+.git
+.claude
+.DS_Store
+*.db
+*.sqlite3
+node_modules
+dist
+.env.local
+banco1
+docs

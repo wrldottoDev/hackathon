@@ -21,6 +21,8 @@ class TransferRequest(BaseModel):
     amount: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
     channel: str = Field(default="web", min_length=2, max_length=50)
     location: str = Field(default="", max_length=255)
+    beneficiary: str = Field(default="", max_length=255)
+    concept: str = Field(default="", max_length=500)
     description: str = Field(default="", max_length=500)
 
     @field_validator("source_account_number", "destination_account_number", mode="before")
@@ -30,7 +32,7 @@ class TransferRequest(BaseModel):
             return value
         return value.strip().upper()
 
-    @field_validator("channel", "location", "description", mode="before")
+    @field_validator("channel", "location", "beneficiary", "concept", "description", mode="before")
     @classmethod
     def normalize_text_fields(cls, value: str) -> str:
         if not isinstance(value, str):
@@ -54,6 +56,8 @@ class InterbankReceiveRequest(BaseModel):
     currency: str = Field(default="CRC", min_length=3, max_length=10)
     channel: str = Field(default="api", min_length=2, max_length=50)
     location: str = Field(default="", max_length=255)
+    beneficiary: str = Field(default="", max_length=255)
+    concept: str = Field(default="", max_length=500)
     description: str = Field(default="", max_length=500)
     external_reference: str = Field(min_length=8, max_length=100)
 
@@ -71,7 +75,7 @@ class InterbankReceiveRequest(BaseModel):
             return value
         return value.strip().upper()
 
-    @field_validator("channel", "location", "description", mode="before")
+    @field_validator("channel", "location", "beneficiary", "concept", "description", mode="before")
     @classmethod
     def normalize_receive_text_fields(cls, value: str) -> str:
         if not isinstance(value, str):
@@ -110,9 +114,13 @@ class TransactionResponse(BaseModel):
     status: str
     channel: str
     location: Optional[str]
+    beneficiary: Optional[str]
+    concept: Optional[str]
     description: Optional[str]
     external_reference: Optional[str]
     failure_reason: Optional[str]
+    source_balance_before: Optional[Decimal]
+    source_balance_after: Optional[Decimal]
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #050a14;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1a2744;
+    border-radius: 4px;
+  }
+
+  input, textarea, select {
+    outline: none;
+  }
+}
+
+@layer components {
+  .risk-ring {
+    position: relative;
+    width: 140px;
+    height: 140px;
+  }
+
+  .risk-ring svg {
+    transform: rotate(-90deg);
+  }
+
+  .risk-ring-bg {
+    stroke: #1a2744;
+  }
+
+  .pulse-dot {
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .scan-line {
+    animation: scan 2s linear infinite;
+  }
+
+  @keyframes scan {
+    0% { transform: translateY(-100%); opacity: 0; }
+    50% { opacity: 1; }
+    100% { transform: translateY(100%); opacity: 0; }
+  }
+
+  .shimmer {
+    background: linear-gradient(90deg, #0c1524 25%, #1a2744 50%, #0c1524 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+}

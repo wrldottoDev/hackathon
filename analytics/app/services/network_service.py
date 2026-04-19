@@ -3,9 +3,11 @@ from collections import defaultdict
 from sqlalchemy.orm import Session
 
 from ..core.money import ZERO_MONEY, to_money
+from ..models.observed_account import ObservedAccount
 from ..models.observed_transaction import ObservedTransaction
 from ..models.risk_alert import RiskAlert
 from ..schemas.network import GraphEdge, GraphNode, GraphResponse
+from .privacy_service import display_account_number
 
 
 def _risk_rank(level: str) -> int:
@@ -26,6 +28,12 @@ def get_network_graph(db: Session) -> GraphResponse:
         .all()
     )
     alerts = db.query(RiskAlert).all()
+    protected_accounts = {
+        account.account_number
+        for account in db.query(ObservedAccount)
+        .filter(ObservedAccount.data_protected_by_investigation.is_(True))
+        .all()
+    }
 
     node_levels: dict[str, list[str]] = defaultdict(list)
     for alert in alerts:
@@ -46,9 +54,10 @@ def get_network_graph(db: Session) -> GraphResponse:
     nodes = [
         GraphNode(
             id=account_number,
-            label=account_number,
+            label=display_account_number(account_number, protected_accounts),
             bank_code=account_number.split("-", 1)[0],
             risk=_max_risk(node_levels.get(account_number, [])),
+            protected=account_number in protected_accounts,
             transaction_count=count,
         )
         for account_number, count in sorted(node_counts.items())

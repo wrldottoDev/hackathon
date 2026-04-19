@@ -1,0 +1,16 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+ARG SERVICE_DIR
+COPY ${SERVICE_DIR}/frontend/package.json ${SERVICE_DIR}/frontend/package-lock.json* ./
+
+RUN npm ci --ignore-scripts 2>/dev/null || npm install
+
+COPY ${SERVICE_DIR}/frontend/ ./
+
+ARG PORT=5173
+ENV PORT=${PORT}
+EXPOSE ${PORT}
+
+CMD ["sh", "-c", "npx vite --host 0.0.0.0 --port ${PORT}"]

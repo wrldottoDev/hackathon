@@ -1,0 +1,312 @@
+# ═══════════════════════════════════════════════════════════════
+# FlowLens — Docker Compose Orchestration
+# ═══════════════════════════════════════════════════════════════
+# Usage:
+#   docker compose up -d --build
+#   docker compose logs -f api_banco_a
+#   docker compose down -v  (removes volumes too)
+# ═══════════════════════════════════════════════════════════════
+
+services:
+
+  # ─── PostgreSQL ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: flowlens-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: flowlens
+    ports:
+      - "${FLOWLENS_POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+    networks:
+      - flowlens-network
+
+  # ═══════════════════════════════════════════════════════════
+  # BACKENDS
+  # ═══════════════════════════════════════════════════════════
+
+  api_banco_a:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      args:
+        SERVICE_DIR: banco_a
+        PORT: 8001
+    container_name: flowlens-api-banco-a
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/flowlens_banco_a
+      BANK_ID: banco_a
+      BANK_NAME: Banco A
+      BANK_CODE: BKA
+      BANK_SECRET_KEY: ${BANCO_A_SECRET_KEY}
+      BANK_PUBLIC_API_URL: http://api_banco_a:8001
+      FLOWLENS_SERVICE_TOKEN: ${FLOWLENS_SERVICE_TOKEN}
+      FLOWLENS_ANALYTICS_API_KEY: ${FLOWLENS_ANALYTICS_API_KEY}
+      FLOWLENS_BANK_REGISTRY: "BKA=http://api_banco_a:8001,BKB=http://api_banco_b:8002,BKC=http://api_banco_c:8004"
+      BANK_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175,http://localhost:5176,http://127.0.0.1:5176,http://localhost:5177,http://127.0.0.1:5177"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - flowlens-network
+
+  api_banco_b:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      args:
+        SERVICE_DIR: banco_b
+        PORT: 8002
+    container_name: flowlens-api-banco-b
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/flowlens_banco_b
+      BANK_ID: banco_b
+      BANK_NAME: Banco B
+      BANK_CODE: BKB
+      BANK_SECRET_KEY: ${BANCO_B_SECRET_KEY}
+      BANK_PUBLIC_API_URL: http://api_banco_b:8002
+      FLOWLENS_SERVICE_TOKEN: ${FLOWLENS_SERVICE_TOKEN}
+      FLOWLENS_ANALYTICS_API_KEY: ${FLOWLENS_ANALYTICS_API_KEY}
+      FLOWLENS_BANK_REGISTRY: "BKA=http://api_banco_a:8001,BKB=http://api_banco_b:8002,BKC=http://api_banco_c:8004"
+      BANK_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175,http://localhost:5176,http://127.0.0.1:5176,http://localhost:5177,http://127.0.0.1:5177"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - flowlens-network
+
+  api_banco_c:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      args:
+        SERVICE_DIR: banco_c
+        PORT: 8004
+    container_name: flowlens-api-banco-c
+    ports:
+      - "8004:8004"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/flowlens_banco_c
+      BANK_ID: banco_c
+      BANK_NAME: Banco C
+      BANK_CODE: BKC
+      BANK_SECRET_KEY: ${BANCO_C_SECRET_KEY}
+      BANK_PUBLIC_API_URL: http://api_banco_c:8004
+      FLOWLENS_SERVICE_TOKEN: ${FLOWLENS_SERVICE_TOKEN}
+      FLOWLENS_ANALYTICS_API_KEY: ${FLOWLENS_ANALYTICS_API_KEY}
+      FLOWLENS_BANK_REGISTRY: "BKA=http://api_banco_a:8001,BKB=http://api_banco_b:8002,BKC=http://api_banco_c:8004"
+      BANK_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175,http://localhost:5176,http://127.0.0.1:5176,http://localhost:5177,http://127.0.0.1:5177"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - flowlens-network
+
+  api_analytics:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      args:
+        SERVICE_DIR: analytics
+        PORT: 8003
+    container_name: flowlens-api-analytics
+    ports:
+      - "8003:8003"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/flowlens_analytics
+      FLOWLENS_ANALYTICS_API_KEY: ${FLOWLENS_ANALYTICS_API_KEY}
+      FLOWLENS_SERVICE_TOKEN: ${FLOWLENS_SERVICE_TOKEN}
+      ANALYTICS_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175,http://localhost:5176,http://127.0.0.1:5176,http://localhost:5177,http://127.0.0.1:5177"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - flowlens-network
+
+  api_finsta:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      args:
+        SERVICE_DIR: finsta
+        PORT: 8005
+    container_name: flowlens-api-finsta
+    ports:
+      - "8005:8005"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/flowlens_finsta
+      FLOWLENS_FINSTA_API_KEY: ${FLOWLENS_FINSTA_API_KEY}
+      FLOWLENS_ANALYTICS_API_KEY: ${FLOWLENS_ANALYTICS_API_KEY}
+      ANALYTICS_API_URL: http://api_analytics:8003
+      FINSTA_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5176,http://127.0.0.1:5176,http://localhost:5177,http://127.0.0.1:5177"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - flowlens-network
+
+  api_safecall:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      args:
+        SERVICE_DIR: safecall
+        PORT: 8006
+    container_name: flowlens-api-safecall
+    ports:
+      - "8006:8006"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/flowlens_safecall
+      FLOWLENS_SAFECALL_API_KEY: ${FLOWLENS_SAFECALL_API_KEY}
+      FLOWLENS_ANALYTICS_API_KEY: ${FLOWLENS_ANALYTICS_API_KEY}
+      ANALYTICS_API_URL: http://api_analytics:8003
+      SAFECALL_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5178,http://127.0.0.1:5178"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - flowlens-network
+
+  # ═══════════════════════════════════════════════════════════
+  # FRONTENDS
+  # ═══════════════════════════════════════════════════════════
+
+  ui_banco_a:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        SERVICE_DIR: banco_a
+        PORT: 5173
+    container_name: flowlens-ui-banco-a
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://127.0.0.1:8001
+      VITE_BANK_ID: banco_a
+      VITE_BANK_NAME: Banco A
+      VITE_BANK_CODE: BKA
+    depends_on:
+      - api_banco_a
+    networks:
+      - flowlens-network
+
+  ui_banco_b:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        SERVICE_DIR: banco_b
+        PORT: 5174
+    container_name: flowlens-ui-banco-b
+    ports:
+      - "5174:5174"
+    environment:
+      VITE_API_URL: http://127.0.0.1:8002
+      VITE_BANK_ID: banco_b
+      VITE_BANK_NAME: Banco B
+      VITE_BANK_CODE: BKB
+    depends_on:
+      - api_banco_b
+    networks:
+      - flowlens-network
+
+  ui_banco_c:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        SERVICE_DIR: banco_c
+        PORT: 5176
+    container_name: flowlens-ui-banco-c
+    ports:
+      - "5176:5176"
+    environment:
+      VITE_API_URL: http://127.0.0.1:8004
+      VITE_BANK_ID: banco_c
+      VITE_BANK_NAME: Banco C
+      VITE_BANK_CODE: BKC
+    depends_on:
+      - api_banco_c
+    networks:
+      - flowlens-network
+
+  ui_analytics:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        SERVICE_DIR: analytics
+        PORT: 5175
+    container_name: flowlens-ui-analytics
+    ports:
+      - "5175:5175"
+    environment:
+      VITE_ANALYTICS_API_URL: http://127.0.0.1:8003
+      VITE_ANALYTICS_API_KEY: ${FLOWLENS_ANALYTICS_API_KEY}
+      VITE_BANK_A_API_URL: http://127.0.0.1:8001
+      VITE_BANK_B_API_URL: http://127.0.0.1:8002
+    depends_on:
+      - api_analytics
+    networks:
+      - flowlens-network
+
+  ui_finsta:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        SERVICE_DIR: finsta
+        PORT: 5177
+    container_name: flowlens-ui-finsta
+    ports:
+      - "5177:5177"
+    environment:
+      VITE_API_URL: http://127.0.0.1:8005
+    depends_on:
+      - api_finsta
+    networks:
+      - flowlens-network
+
+
+  ui_safecall:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        SERVICE_DIR: safecall
+        PORT: 5178
+    container_name: flowlens-ui-safecall
+    ports:
+      - "5178:5178"
+    environment:
+      VITE_API_URL: http://127.0.0.1:8006
+    depends_on:
+      - api_safecall
+    networks:
+      - flowlens-network
+
+# ═══════════════════════════════════════════════════════════
+# INFRASTRUCTURE
+# ═══════════════════════════════════════════════════════════
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  flowlens-network:
+    driver: bridge

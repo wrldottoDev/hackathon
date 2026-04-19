@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
@@ -27,6 +27,41 @@ from ..settings import (
 
 def _round_money(amount: Decimal | int | float | str) -> Decimal:
     return to_money(amount)
+
+
+def _normalize_text(value: str | None) -> str:
+    if not value:
+        return ""
+    return value.strip()
+
+
+def _resolve_concept(data: TransferRequest | InterbankReceiveRequest) -> str:
+    return _normalize_text(data.concept) or _normalize_text(data.description)
+
+
+def _resolve_beneficiary(
+    raw_beneficiary: str | None,
+    default_account_number: str,
+) -> str:
+    return _normalize_text(raw_beneficiary) or default_account_number
+
+
+def _track_account_activity(
+    account: Account,
+    *,
+    event_at: datetime,
+    location: str | None,
+) -> None:
+    account.last_activity_at = event_at
+    normalized_location = _normalize_text(location)
+    if not normalized_location:
+        return
+
+    history = list(account.location_history or [])
+    if not history or history[-1] != normalized_location:
+        history.append(normalized_location)
+    account.current_location = normalized_location
+    account.location_history = history[-20:]
 
 
 def _parse_bank_code(account_number: str) -> str:
@@ -107,9 +142,14 @@ def _build_transaction(
     status: str,
     channel: str,
     location: str,
+    beneficiary: str,
+    concept: str,
     description: str,
+    created_at: datetime,
     external_reference: str | None = None,
     failure_reason: str | None = None,
+    source_balance_before: Decimal | None = None,
+    source_balance_after: Decimal | None = None,
 ) -> Transaction:
     return Transaction(
         source_account_number=source_account_number,
@@ -120,11 +160,20 @@ def _build_transaction(
         currency=currency,
         transaction_type=transaction_type,
         status=status,
-        channel=channel,
-        location=location,
-        description=description,
+        channel=_normalize_text(channel) or "web",
+        location=_normalize_text(location),
+        beneficiary=beneficiary,
+        concept=concept,
+        description=_normalize_text(description) or concept,
         external_reference=external_reference,
-        failure_reason=failure_reason or "",
+        failure_reason=_normalize_text(failure_reason),
+        source_balance_before=_round_money(source_balance_before)
+        if source_balance_before is not None
+        else None,
+        source_balance_after=_round_money(source_balance_after)
+        if source_balance_after is not None
+        else None,
+        created_at=created_at,
     )
 
 
@@ -136,6 +185,8 @@ def _record_failed_interbank_transaction(
     external_reference: str,
     failure_reason: str,
 ) -> Transaction:
+    event_at = datetime.now(timezone.utc)
+    concept = _resolve_concept(data)
     transaction = _build_transaction(
         source_account_number=source.account_number,
         destination_account_number=data.destination_account_number,
@@ -147,7 +198,13 @@ def _record_failed_interbank_transaction(
         status="failed",
         channel=data.channel,
         location=data.location,
+        beneficiary=_resolve_beneficiary(
+            data.beneficiary,
+            data.destination_account_number,
+        ),
+        concept=concept,
         description=data.description,
+        created_at=event_at,
         external_reference=external_reference,
         failure_reason=failure_reason,
     )
@@ -187,9 +244,19 @@ def create_internal_transfer(
             detail="Saldo insuficiente",
         )
 
+    event_at = datetime.now(timezone.utc)
+    concept = _resolve_concept(data)
+    beneficiary = _resolve_beneficiary(
+        data.beneficiary,
+        destination.account_number,
+    )
+    source_balance_before = _round_money(source.balance)
+
     try:
         source.balance = _round_money(source.balance - data.amount)
         destination.balance = _round_money(destination.balance + data.amount)
+        _track_account_activity(source, event_at=event_at, location=data.location)
+        _track_account_activity(destination, event_at=event_at, location=data.location)
         transaction = _build_transaction(
             source_account_number=source.account_number,
             destination_account_number=destination.account_number,
@@ -201,7 +268,12 @@ def create_internal_transfer(
             status="completed",
             channel=data.channel,
             location=data.location,
+            beneficiary=beneficiary,
+            concept=concept,
             description=data.description,
+            created_at=event_at,
+            source_balance_before=source_balance_before,
+            source_balance_after=source.balance,
         )
         db.add(transaction)
         db.commit()
@@ -247,6 +319,11 @@ def create_interbank_transfer(
 
     destination_bank_url = _resolve_remote_bank_url(destination_bank_code)
     external_reference = uuid4().hex.upper()
+    concept = _resolve_concept(data)
+    beneficiary = _resolve_beneficiary(
+        data.beneficiary,
+        data.destination_account_number,
+    )
     receive_payload = InterbankReceiveRequest(
         source_account_number=source.account_number,
         destination_account_number=data.destination_account_number,
@@ -255,6 +332,8 @@ def create_interbank_transfer(
         currency=source.currency,
         channel=data.channel,
         location=data.location,
+        beneficiary=beneficiary,
+        concept=concept,
         description=data.description,
         external_reference=external_reference,
     )
@@ -299,8 +378,12 @@ def create_interbank_transfer(
             detail=f"Banco destino rechazó la transferencia: {failure_reason}",
         )
 
+    event_at = datetime.now(timezone.utc)
+    source_balance_before = _round_money(source.balance)
+
     try:
         source.balance = _round_money(source.balance - data.amount)
+        _track_account_activity(source, event_at=event_at, location=data.location)
         transaction = _build_transaction(
             source_account_number=source.account_number,
             destination_account_number=data.destination_account_number,
@@ -312,8 +395,13 @@ def create_interbank_transfer(
             status="completed",
             channel=data.channel,
             location=data.location,
+            beneficiary=beneficiary,
+            concept=concept,
             description=data.description,
+            created_at=event_at,
             external_reference=external_reference,
+            source_balance_before=source_balance_before,
+            source_balance_after=source.balance,
         )
         db.add(transaction)
         db.commit()
@@ -403,8 +491,12 @@ def receive_interbank_transfer(
             detail="La moneda de la cuenta destino no coincide con la transferencia",
         )
 
+    event_at = datetime.now(timezone.utc)
+    concept = _resolve_concept(data)
+
     try:
         destination.balance = _round_money(destination.balance + data.amount)
+        _track_account_activity(destination, event_at=event_at, location=data.location)
         transaction = _build_transaction(
             source_account_number=data.source_account_number,
             destination_account_number=destination.account_number,
@@ -416,7 +508,13 @@ def receive_interbank_transfer(
             status="completed",
             channel=data.channel,
             location=data.location,
+            beneficiary=_resolve_beneficiary(
+                data.beneficiary,
+                destination.account_number,
+            ),
+            concept=concept,
             description=data.description,
+            created_at=event_at,
             external_reference=data.external_reference,
         )
         db.add(transaction)
@@ -465,6 +563,11 @@ def reverse_interbank_transfer(
 
     try:
         destination.balance = _round_money(destination.balance - transaction.amount)
+        _track_account_activity(
+            destination,
+            event_at=datetime.now(timezone.utc),
+            location=destination.current_location,
+        )
         transaction.status = "reversed"
         transaction.failure_reason = data.reason
         db.add(transaction)

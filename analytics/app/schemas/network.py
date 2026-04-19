@@ -8,6 +8,7 @@ class GraphNode(BaseModel):
     label: str
     bank_code: str
     risk: str
+    protected: bool = False
     transaction_count: int = 0
 
 

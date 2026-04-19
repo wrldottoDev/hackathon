@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db
-from .routes import accounts, alerts, banks, network, transactions
+from .routes import accounts, alerts, banks, dashboard, external_intel, finsta, investigations, network, reports, transactions
 from .settings import ALLOWED_ORIGINS
 
 
@@ -35,6 +35,11 @@ app.include_router(transactions.router)
 app.include_router(alerts.router)
 app.include_router(network.router)
 app.include_router(accounts.router)
+app.include_router(reports.router)
+app.include_router(finsta.router)
+app.include_router(external_intel.router)
+app.include_router(investigations.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/", tags=["health"])
@@ -45,4 +50,3 @@ def root():
 @app.get("/health", tags=["health"])
 def health():
     return root()
-

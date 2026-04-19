@@ -29,9 +29,13 @@ class ObservedTransaction(Base):
     status = Column(String(20), nullable=False)
     channel = Column(String(50), nullable=False)
     location = Column(String(255), nullable=True)
+    beneficiary = Column(String(255), nullable=True)
+    concept = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
     external_reference = Column(String(100), nullable=True)
     failure_reason = Column(Text, nullable=True)
+    source_balance_before = Column(Numeric(14, 2), nullable=True)
+    source_balance_after = Column(Numeric(14, 2), nullable=True)
     created_at = Column(DateTime, nullable=False)
     fetched_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 

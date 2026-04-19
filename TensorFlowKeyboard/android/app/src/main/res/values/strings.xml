@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">TensorFlowKeyboard</string>
+    <string name="ime_name">TensorFlow Keyboard</string>
+    <string name="ime_subtype_en">English</string>
+    <string name="ime_description">Custom keyboard scaffold ready for on-device AI integration.</string>
+    <string name="accessibility_description">Safe accessibility stub that exposes service state without retrieving text from other apps.</string>
+</resources>

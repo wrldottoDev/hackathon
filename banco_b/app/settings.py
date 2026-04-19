@@ -11,12 +11,15 @@ DEFAULT_BANK_REGISTRY = {
 }
 
 
-def _resolve_database_path() -> Path:
+def _resolve_database_url() -> str:
+    explicit_url = os.getenv("DATABASE_URL")
+    if explicit_url:
+        return explicit_url
     raw_path = os.getenv("BANK_DB_PATH", "banco_b/app/banco_b.db")
     path = Path(raw_path)
     if not path.is_absolute():
         path = ROOT_DIR / path
-    return path.resolve()
+    return f"sqlite:///{path.resolve()}"
 
 
 def _parse_allowed_origins() -> list[str]:
@@ -66,8 +69,7 @@ def _parse_bank_registry() -> dict[str, str]:
 BANK_ID = os.getenv("BANK_ID", "banco_b")
 BANK_NAME = os.getenv("BANK_NAME", "Banco B")
 BANK_CODE = os.getenv("BANK_CODE", "BKB")
-DATABASE_PATH = _resolve_database_path()
-DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
+DATABASE_URL = _resolve_database_url()
 SECRET_KEY = os.getenv("BANK_SECRET_KEY", "banco-b-dev-secret-key-change-me-2026")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "720"))
