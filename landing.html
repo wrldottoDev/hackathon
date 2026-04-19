@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sentinel-Link | Inteligencia 360° contra la Trata de Personas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'void':     '#06080d',
+            'abyss':    '#0a0e17',
+            'obsidian': '#0f1520',
+            'gunmetal': '#1a2233',
+            'slate':    '#2a3548',
+            'ash':      '#8892a4',
+            'electric': '#0ea5e9',
+            'cyan':     '#22d3ee',
+            'neon-red': '#ef4444',
+            'ember':    '#f97316',
+          },
+          fontFamily: {
+            'sans': ['Inter', 'system-ui', 'sans-serif'],
+            'mono': ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #06080d; color: #e2e8f0; overflow-x: hidden; }
+
+    /* ── Scanline overlay ── */
+    .scanline::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(14,165,233,0.015) 2px, rgba(14,165,233,0.015) 4px
+      );
+      pointer-events: none;
+    }
+
+    /* ── Grid background ── */
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(14,165,233,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(14,165,233,0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* ── Glow effects ── */
+    .glow-blue  { box-shadow: 0 0 30px rgba(14,165,233,0.15), 0 0 60px rgba(14,165,233,0.05); }
+    .glow-red   { box-shadow: 0 0 30px rgba(239,68,68,0.2), 0 0 60px rgba(239,68,68,0.08); }
+    .text-glow  { text-shadow: 0 0 40px rgba(14,165,233,0.3); }
+    .text-glow-red { text-shadow: 0 0 40px rgba(239,68,68,0.4); }
+
+    /* ── Animations ── */
+    @keyframes float     { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    @keyframes pulse-ring { 0% { transform: scale(1); opacity: .5; } 100% { transform: scale(1.8); opacity: 0; } }
+    @keyframes scan       { 0% { top: 0; } 100% { top: 100%; } }
+    @keyframes blink      { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+    @keyframes slide-up   { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fade-in    { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes flow       { 0% { stroke-dashoffset: 20; } 100% { stroke-dashoffset: 0; } }
+    @keyframes radar      { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes typewriter { from { width: 0; } to { width: 100%; } }
+    @keyframes data-stream { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
+
+    .animate-float     { animation: float 4s ease-in-out infinite; }
+    .animate-pulse-ring { animation: pulse-ring 2s ease-out infinite; }
+    .animate-scan      { animation: scan 3s linear infinite; }
+    .animate-blink     { animation: blink 1s step-end infinite; }
+    .animate-slide-up  { animation: slide-up 0.8s ease-out both; }
+    .animate-fade-in   { animation: fade-in 1s ease-out both; }
+    .animate-flow      { animation: flow 1.5s linear infinite; }
+    .animate-radar     { animation: radar 4s linear infinite; }
+
+    .delay-100 { animation-delay: 0.1s; }
+    .delay-200 { animation-delay: 0.2s; }
+    .delay-300 { animation-delay: 0.3s; }
+    .delay-400 { animation-delay: 0.4s; }
+    .delay-500 { animation-delay: 0.5s; }
+    .delay-600 { animation-delay: 0.6s; }
+    .delay-700 { animation-delay: 0.7s; }
+
+    /* ── Heatmap dot pulse ── */
+    @keyframes heat-pulse {
+      0%, 100% { r: 4; opacity: 0.7; }
+      50%      { r: 7; opacity: 1; }
+    }
+    .heat-dot { animation: heat-pulse 2s ease-in-out infinite; }
+
+    /* ── Connection line ── */
+    .conn-line {
+      stroke-dasharray: 6 4;
+      animation: flow 1s linear infinite;
+    }
+
+    /* ── Card hover ── */
+    .pillar-card {
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .pillar-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 0 40px rgba(14,165,233,0.12);
+    }
+
+    /* ── Scroll reveal ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── Custom scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0a0e17; }
+    ::-webkit-scrollbar-thumb { background: #1a2233; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #2a3548; }
+  </style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ═══════════════════════════════════════════
+   UTILITY: Intersection Observer for reveals
+   ═══════════════════════════════════════════ */
+function useReveal() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      },
+      { threshold: 0.15 }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+  return ref;
+}
+
+/* ═══════════════════════════════════════════
+   NAVBAR
+   ═══════════════════════════════════════════ */
+function Navbar() {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const handler = () => setScrolled(window.scrollY > 60);
+    window.addEventListener('scroll', handler);
+    return () => window.removeEventListener('scroll', handler);
+  }, []);
+
+  return (
+    <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${
+      scrolled ? 'bg-abyss/90 backdrop-blur-xl border-b border-gunmetal/50' : 'bg-transparent'
+    }`}>
+      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-electric to-cyan flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M12 2L3 7v6c0 5.25 3.83 10.14 9 11.25C17.17 23.14 21 18.25 21 13V7l-9-5z"/>
+                <path d="M9 12l2 2 4-4"/>
+              </svg>
+            </div>
+            <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-abyss"></div>
+          </div>
+          <span className="font-bold text-lg tracking-tight">
+            <span className="text-white">Sentinel</span>
+            <span className="text-electric">-Link</span>
+          </span>
+        </div>
+        <div className="hidden md:flex items-center gap-8 text-sm font-medium text-ash">
+          <a href="#ecosistema" className="hover:text-electric transition-colors">Ecosistema</a>
+          <a href="#seguridad" className="hover:text-electric transition-colors">Seguridad</a>
+          <a href="#dashboard" className="hover:text-electric transition-colors">Dashboard</a>
+          <a href="#dossier" className="hover:text-electric transition-colors">Dossier</a>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/5 text-emerald-400 text-xs font-mono">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            SISTEMA ACTIVO
+          </span>
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   HERO SECTION
+   ═══════════════════════════════════════════ */
+function HeroSection() {
+  const [typed, setTyped] = useState('');
+  const fullText = 'THREAT_DETECTED: human_trafficking_pattern';
+  useEffect(() => {
+    let i = 0;
+    const interval = setInterval(() => {
+      if (i <= fullText.length) { setTyped(fullText.slice(0, i)); i++; }
+      else { clearInterval(interval); }
+    }, 50);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <section className="relative min-h-screen flex items-center justify-center grid-bg scanline overflow-hidden">
+      {/* Radial gradient overlays */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[600px] bg-electric/[0.03] rounded-full blur-[120px]"></div>
+      <div className="absolute bottom-0 right-0 w-[500px] h-[400px] bg-neon-red/[0.02] rounded-full blur-[100px]"></div>
+
+      {/* Floating particles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(6)].map((_, i) => (
+          <div key={i}
+            className="absolute w-1 h-1 bg-electric/30 rounded-full animate-float"
+            style={{
+              left: `${15 + i * 15}%`,
+              top: `${20 + (i % 3) * 25}%`,
+              animationDelay: `${i * 0.7}s`,
+              animationDuration: `${3 + i * 0.5}s`,
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-24">
+        {/* Terminal badge */}
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gunmetal bg-obsidian/80 mb-8 animate-slide-up">
+          <span className="w-2 h-2 rounded-full bg-neon-red animate-pulse"></span>
+          <span className="font-mono text-xs text-neon-red tracking-wider">HACKATHON 2026 — COSTA RICA</span>
+        </div>
+
+        {/* Main title */}
+        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05] mb-6 animate-slide-up delay-100">
+          <span className="text-white">Rompiendo el Silencio</span>
+          <br />
+          <span className="text-white">de la Trata con </span>
+          <span className="bg-gradient-to-r from-electric via-cyan to-electric bg-clip-text text-transparent text-glow">
+            Inteligencia 360°
+          </span>
+        </h1>
+
+        {/* Subtitle */}
+        <p className="text-lg sm:text-xl text-ash max-w-3xl mx-auto mb-10 leading-relaxed animate-slide-up delay-200">
+          La primera solución que conecta la <span className="text-white font-semibold">prevención en el teclado</span> con
+          el <span className="text-white font-semibold">análisis financiero en tiempo real</span> bajo protocolos de
+          <span className="text-electric font-semibold"> grado gubernamental SGT</span>.
+        </p>
+
+        {/* Terminal preview */}
+        <div className="max-w-2xl mx-auto mb-10 animate-slide-up delay-300">
+          <div className="bg-obsidian/90 border border-gunmetal rounded-xl overflow-hidden glow-blue">
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gunmetal/60 bg-abyss/50">
+              <div className="flex gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-neon-red/70"></div>
+                <div className="w-3 h-3 rounded-full bg-ember/70"></div>
+                <div className="w-3 h-3 rounded-full bg-emerald-400/70"></div>
+              </div>
+              <span className="font-mono text-[11px] text-ash/60 ml-2">sentinel-link://intelligence-engine</span>
+            </div>
+            <div className="p-5 font-mono text-sm text-left">
+              <div className="text-ash/50">$ sentinel-link --scan --mode=realtime</div>
+              <div className="mt-2 text-emerald-400">[OK] Edge AI Classifier loaded (TFLite v2.16)</div>
+              <div className="text-emerald-400">[OK] SGT Transport encrypted (AES-256-GCM / RSA-OAEP)</div>
+              <div className="text-emerald-400">[OK] Gemini 2.5 Pro correlation engine online</div>
+              <div className="mt-2 text-neon-red flex items-center gap-2">
+                <span className="animate-blink">!</span>
+                <span>{typed}<span className="animate-blink text-electric">|</span></span>
+              </div>
+              <div className="mt-1 text-electric/80">
+                → Correlating 3 bank accounts + 12 chat buffers...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up delay-400">
+          <a href="#dossier"
+            className="group relative px-8 py-4 bg-gradient-to-r from-electric to-cyan text-white font-semibold rounded-xl
+                       hover:shadow-[0_0_40px_rgba(14,165,233,0.3)] transition-all duration-300">
+            <span className="relative z-10 flex items-center gap-2">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <path d="M14 2v6h6"/>
+                <path d="M16 13H8"/>
+                <path d="M16 17H8"/>
+              </svg>
+              Ver Expediente de Inteligencia
+            </span>
+          </a>
+          <a href="#ecosistema"
+            className="px-8 py-4 border border-gunmetal text-ash font-semibold rounded-xl hover:border-electric/50
+                       hover:text-white transition-all duration-300">
+            Explorar Arquitectura
+          </a>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-8 max-w-lg mx-auto mt-16 animate-slide-up delay-500">
+          {[
+            { value: '< 50ms', label: 'Latencia Edge AI' },
+            { value: 'E2E', label: 'Cifrado Híbrido' },
+            { value: '360°', label: 'Correlación' },
+          ].map((s, i) => (
+            <div key={i} className="text-center">
+              <div className="text-2xl font-bold text-white">{s.value}</div>
+              <div className="text-xs text-ash mt-1">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Scroll indicator */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 animate-fade-in delay-700">
+        <span className="text-[10px] font-mono text-ash/40 tracking-widest uppercase">Scroll</span>
+        <div className="w-5 h-8 rounded-full border border-ash/20 flex items-start justify-center p-1">
+          <div className="w-1 h-2 bg-electric/60 rounded-full animate-pulse"></div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   ECOSYSTEM / THREE PILLARS
+   ═══════════════════════════════════════════ */
+function PillarCard({ icon, tag, tagColor, title, description, features, index }) {
+  const ref = useReveal();
+  const colors = {
+    blue: 'border-electric/20 text-electric bg-electric/5',
+    red: 'border-neon-red/20 text-neon-red bg-neon-red/5',
+    cyan: 'border-cyan/20 text-cyan bg-cyan/5',
+  };
+
+  return (
+    <div ref={ref} className="reveal pillar-card bg-obsidian/60 border border-gunmetal/60 rounded-2xl p-8 relative overflow-hidden"
+         style={{ transitionDelay: `${index * 150}ms` }}>
+      {/* Top accent line */}
+      <div className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${
+        tagColor === 'blue' ? 'from-transparent via-electric to-transparent' :
+        tagColor === 'red' ? 'from-transparent via-neon-red to-transparent' :
+        'from-transparent via-cyan to-transparent'
+      }`}></div>
+
+      <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono tracking-wider mb-6 border ${colors[tagColor]}`}>
+        {tag}
+      </div>
+
+      <div className="mb-5">{icon}</div>
+
+      <h3 className="text-xl font-bold text-white mb-3">{title}</h3>
+      <p className="text-ash text-sm leading-relaxed mb-6">{description}</p>
+
+      <ul className="space-y-3">
+        {features.map((f, i) => (
+          <li key={i} className="flex items-start gap-3 text-sm">
+            <svg className="w-4 h-4 mt-0.5 text-electric flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M20 6L9 17l-5-5"/>
+            </svg>
+            <span className="text-ash/80">{f}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function EcosystemSection() {
+  const headerRef = useReveal();
+
+  const pillars = [
+    {
+      tag: 'PILAR 01 — EDGE AI',
+      tagColor: 'blue',
+      title: 'El Centinela',
+      description: 'Teclado inteligente en Flutter con clasificador TFLite que analiza cada mensaje en el dispositivo. Cero datos en la nube. Privacidad absoluta.',
+      features: [
+        'Clasificador NLP local con TensorFlow Lite — inferencia en < 50ms',
+        'Buffer de contexto efímero procesado 100% en RAM volátil',
+        'Whitelist de contactos de confianza — solo alerta con desconocidos',
+        'Detección de patrones: grooming, sextorsión, fraude financiero y trata',
+        'Speech-to-Text (STT) on-device para análisis de notas de voz',
+      ],
+      icon: (
+        <div className="w-14 h-14 rounded-xl bg-electric/10 border border-electric/20 flex items-center justify-center">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="1.5">
+            <rect x="2" y="6" width="20" height="12" rx="2"/>
+            <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/>
+          </svg>
+        </div>
+      ),
+    },
+    {
+      tag: 'PILAR 02 — SGT TRANSPORT',
+      tagColor: 'red',
+      title: 'El Tunel',
+      description: 'Canal blindado con cifrado hibrido AES-256-GCM / RSA-OAEP y Security Group Tagging que garantiza que solo la Intranet del CONATT recibe las alertas.',
+      features: [
+        'Cifrado hibrido: AES-256-GCM para payload + RSA-OAEP para clave de sesion',
+        'Header X-SGT-Tag valida origen antes de aceptar la denuncia',
+        'IP Whitelist del middleware SGT — solo nodos autorizados',
+        'Fingerprint SHA-256 de clave publica para verificacion de integridad',
+        'Recibo de inmutabilidad (hash) como prueba de entrega al denunciante',
+      ],
+      icon: (
+        <div className="w-14 h-14 rounded-xl bg-neon-red/10 border border-neon-red/20 flex items-center justify-center">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.5">
+            <path d="M12 2L3 7v6c0 5.25 3.83 10.14 9 11.25C17.17 23.14 21 18.25 21 13V7l-9-5z"/>
+            <path d="M12 11v2M12 15h.01"/>
+          </svg>
+        </div>
+      ),
+    },
+    {
+      tag: 'PILAR 03 — INTELLIGENCE',
+      tagColor: 'cyan',
+      title: 'El Cerebro',
+      description: 'Motor de correlacion con Gemini 2.5 Pro que cruza chats cifrados, transacciones bancarias y patrones de legitimacion de capitales en una Intranet segura.',
+      features: [
+        'Gemini 2.5 Pro correlaciona alertas + transacciones en ventana de 24h',
+        'Deteccion de legitimacion de capitales via patrones transaccionales',
+        'Red de grafos que vincula cuentas bancarias con chats sospechosos',
+        'Mapa de calor geografico para identificar zonas de riesgo',
+        'Generacion automatica de Expediente Digital PDF para el OIJ',
+      ],
+      icon: (
+        <div className="w-14 h-14 rounded-xl bg-cyan/10 border border-cyan/20 flex items-center justify-center">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" strokeWidth="1.5">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <section id="ecosistema" className="relative py-28 px-6">
+      <div className="max-w-7xl mx-auto">
+        <div ref={headerRef} className="reveal text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-gunmetal bg-obsidian/60 text-[11px] font-mono text-ash tracking-wider mb-4">
+            ARQUITECTURA DEL ECOSISTEMA
+          </div>
+          <h2 className="text-4xl sm:text-5xl font-bold text-white mb-4">
+            Tres Pilares. <span className="text-electric">Una Mision.</span>
+          </h2>
+          <p className="text-ash max-w-2xl mx-auto">
+            Desde el teclado del dispositivo hasta el expediente judicial: cada capa esta disenada
+            para proteger a la victima sin comprometer su privacidad.
+          </p>
+        </div>
+
+        {/* Connection line between pillars */}
+        <div className="hidden lg:block relative">
+          <div className="absolute top-1/2 left-[16.6%] right-[16.6%] h-px">
+            <div className="w-full h-px bg-gradient-to-r from-electric via-neon-red to-cyan opacity-20"></div>
+            <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-electric via-neon-red to-cyan opacity-40"
+                 style={{ maskImage: 'linear-gradient(90deg, transparent, white, transparent)' }}></div>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6">
+          {pillars.map((p, i) => <PillarCard key={i} {...p} index={i} />)}
+        </div>
+
+        {/* Flow diagram */}
+        <div className="mt-12 flex items-center justify-center gap-4 text-xs font-mono text-ash/50">
+          <span className="px-3 py-1.5 border border-electric/20 rounded bg-electric/5 text-electric">DEVICE</span>
+          <svg width="40" height="12" viewBox="0 0 40 12"><path d="M0 6h32M32 6l-4-4M32 6l-4 4" stroke="#0ea5e9" strokeWidth="1" opacity="0.5" fill="none"/></svg>
+          <span className="px-3 py-1.5 border border-neon-red/20 rounded bg-neon-red/5 text-neon-red">SGT TUNNEL</span>
+          <svg width="40" height="12" viewBox="0 0 40 12"><path d="M0 6h32M32 6l-4-4M32 6l-4 4" stroke="#ef4444" strokeWidth="1" opacity="0.5" fill="none"/></svg>
+          <span className="px-3 py-1.5 border border-cyan/20 rounded bg-cyan/5 text-cyan">INTRANET CONATT</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   SECURITY SECTION
+   ═══════════════════════════════════════════ */
+function SecuritySection() {
+  const ref = useReveal();
+
+  const panels = [
+    {
+      icon: '🔒',
+      title: 'Privacidad por Diseno',
+      subtitle: 'ZERO-CLOUD ARCHITECTURE',
+      color: 'electric',
+      items: [
+        { label: 'Procesamiento NLP', value: '100% On-Device' },
+        { label: 'Buffer de texto', value: 'RAM volatil (efimero)' },
+        { label: 'Modelo TFLite', value: 'Embebido en APK' },
+        { label: 'Datos en nube', value: 'NINGUNO' },
+      ],
+    },
+    {
+      icon: '⛓️',
+      title: 'Inmutabilidad',
+      subtitle: 'HASH-BASED EVIDENCE CHAIN',
+      color: 'cyan',
+      items: [
+        { label: 'Hash de denuncia', value: 'SHA-256 canonico' },
+        { label: 'Recibo al denunciante', value: 'Hash inmutable' },
+        { label: 'Deduplicacion', value: 'Por hash unico' },
+        { label: 'Cadena de custodia', value: 'Audit trail completo' },
+      ],
+    },
+    {
+      icon: '🚨',
+      title: 'Modo Rescate',
+      subtitle: 'COERCION-PROOF MECHANISM',
+      color: 'neon-red',
+      items: [
+        { label: 'PIN de coaccion', value: 'Invisible al agresor' },
+        { label: 'Alerta silenciosa', value: 'Envio sin notificacion' },
+        { label: 'Trigger automatico', value: 'Cambio PIN + link malicioso' },
+        { label: 'Prioridad', value: 'Escalamiento inmediato' },
+      ],
+    },
+  ];
+
+  return (
+    <section id="seguridad" className="relative py-28 px-6 bg-abyss/50">
+      {/* Background accent */}
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gunmetal to-transparent"></div>
+
+      <div className="max-w-7xl mx-auto">
+        <div ref={ref} className="reveal text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-neon-red/20 bg-neon-red/5 text-[11px] font-mono text-neon-red tracking-wider mb-4">
+            <span className="w-1.5 h-1.5 rounded-full bg-neon-red animate-pulse"></span>
+            SECURITY ARCHITECTURE
+          </div>
+          <h2 className="text-4xl sm:text-5xl font-bold text-white mb-4">
+            Seguridad de <span className="text-neon-red text-glow-red">Grado Gubernamental</span>
+          </h2>
+          <p className="text-ash max-w-2xl mx-auto">
+            Cada componente fue disenado con el principio de minimo privilegio y proteccion
+            de la victima como prioridad absoluta.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6">
+          {panels.map((panel, i) => {
+            const panelRef = useReveal();
+            const borderColor = panel.color === 'electric' ? 'border-electric/20' :
+                               panel.color === 'cyan' ? 'border-cyan/20' : 'border-neon-red/20';
+            const dotColor = panel.color === 'electric' ? 'bg-electric' :
+                            panel.color === 'cyan' ? 'bg-cyan' : 'bg-neon-red';
+
+            return (
+              <div key={i} ref={panelRef}
+                className={`reveal bg-obsidian/80 border ${borderColor} rounded-2xl p-6 relative`}
+                style={{ transitionDelay: `${i * 150}ms` }}>
+                <div className="text-3xl mb-4">{panel.icon}</div>
+                <h3 className="text-lg font-bold text-white mb-1">{panel.title}</h3>
+                <div className="font-mono text-[10px] text-ash/50 tracking-wider mb-6">{panel.subtitle}</div>
+
+                <div className="space-y-4">
+                  {panel.items.map((item, j) => (
+                    <div key={j} className="flex items-center justify-between py-2 border-b border-gunmetal/40 last:border-0">
+                      <span className="text-sm text-ash/70">{item.label}</span>
+                      <span className="flex items-center gap-2 text-sm font-mono text-white">
+                        <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`}></span>
+                        {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   LIVE DASHBOARD PREVIEW
+   ═══════════════════════════════════════════ */
+function CostaRicaHeatmap() {
+  const hotspots = [
+    { cx: 130, cy: 85,  r: 5, color: '#ef4444', label: 'San Jose',      opacity: 0.9, delay: '0s' },
+    { cx: 115, cy: 75,  r: 4, color: '#f97316', label: 'Alajuela',      opacity: 0.7, delay: '0.3s' },
+    { cx: 148, cy: 78,  r: 4, color: '#ef4444', label: 'Cartago',       opacity: 0.8, delay: '0.6s' },
+    { cx: 160, cy: 70,  r: 3, color: '#f97316', label: 'Limon',         opacity: 0.6, delay: '0.9s' },
+    { cx: 95,  cy: 68,  r: 3, color: '#eab308', label: 'Puntarenas',    opacity: 0.5, delay: '1.2s' },
+    { cx: 70,  cy: 95,  r: 3, color: '#eab308', label: 'Guanacaste',    opacity: 0.4, delay: '1.5s' },
+    { cx: 138, cy: 92,  r: 3, color: '#f97316', label: 'Heredia',       opacity: 0.7, delay: '0.4s' },
+  ];
+
+  return (
+    <svg viewBox="0 0 240 160" className="w-full h-full">
+      {/* Simplified Costa Rica shape */}
+      <path d="M40,55 Q50,45 65,42 Q80,38 95,35 Q110,32 120,38 Q130,42 140,40 Q155,36 170,42 Q180,48 185,55 Q188,62 185,70 Q180,78 175,82 Q168,88 160,90 Q152,95 145,98 Q138,102 130,100 Q122,98 115,95 Q108,92 100,95 Q92,98 85,102 Q78,105 70,102 Q60,98 55,90 Q48,82 42,72 Q38,62 40,55Z"
+            fill="none" stroke="#1a2233" strokeWidth="1" opacity="0.8"/>
+      <path d="M40,55 Q50,45 65,42 Q80,38 95,35 Q110,32 120,38 Q130,42 140,40 Q155,36 170,42 Q180,48 185,55 Q188,62 185,70 Q180,78 175,82 Q168,88 160,90 Q152,95 145,98 Q138,102 130,100 Q122,98 115,95 Q108,92 100,95 Q92,98 85,102 Q78,105 70,102 Q60,98 55,90 Q48,82 42,72 Q38,62 40,55Z"
+            fill="url(#mapGrad)" opacity="0.3"/>
+
+      <defs>
+        <radialGradient id="mapGrad" cx="50%" cy="50%">
+          <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.15"/>
+          <stop offset="100%" stopColor="transparent"/>
+        </radialGradient>
+      </defs>
+
+      {/* Heat circles */}
+      {hotspots.map((h, i) => (
+        <g key={i}>
+          <circle cx={h.cx} cy={h.cy} r={h.r * 3} fill={h.color} opacity="0.08"/>
+          <circle cx={h.cx} cy={h.cy} r={h.r * 2} fill={h.color} opacity="0.12"/>
+          <circle cx={h.cx} cy={h.cy} r={h.r} fill={h.color} opacity={h.opacity}
+                  className="heat-dot" style={{ animationDelay: h.delay }}/>
+          <text x={h.cx} y={h.cy - h.r - 5} textAnchor="middle"
+                fill="#8892a4" fontSize="5" fontFamily="Inter">{h.label}</text>
+        </g>
+      ))}
+
+      {/* Legend */}
+      <g transform="translate(10, 130)">
+        <circle cx="0" cy="0" r="3" fill="#ef4444"/>
+        <text x="8" y="2" fill="#8892a4" fontSize="5">Critico</text>
+        <circle cx="40" cy="0" r="3" fill="#f97316"/>
+        <text x="48" y="2" fill="#8892a4" fontSize="5">Alto</text>
+        <circle cx="72" cy="0" r="3" fill="#eab308"/>
+        <text x="80" y="2" fill="#8892a4" fontSize="5">Medio</text>
+      </g>
+    </svg>
+  );
+}
+
+function NetworkGraph() {
+  const nodes = [
+    { id: 'bank1', x: 60,  y: 40,  label: 'BKA-4521',   type: 'bank',  color: '#0ea5e9' },
+    { id: 'bank2', x: 180, y: 35,  label: 'BKB-7733',   type: 'bank',  color: '#0ea5e9' },
+    { id: 'bank3', x: 120, y: 110, label: 'BKC-1290',   type: 'bank',  color: '#f97316' },
+    { id: 'chat1', x: 60,  y: 110, label: 'Chat #0042', type: 'alert', color: '#ef4444' },
+    { id: 'chat2', x: 180, y: 110, label: 'Chat #0089', type: 'alert', color: '#ef4444' },
+    { id: 'hub',   x: 120, y: 65,  label: 'HUB',        type: 'hub',   color: '#22d3ee' },
+  ];
+
+  const edges = [
+    { from: 'bank1', to: 'hub' },
+    { from: 'bank2', to: 'hub' },
+    { from: 'bank3', to: 'hub' },
+    { from: 'chat1', to: 'hub' },
+    { from: 'chat2', to: 'hub' },
+    { from: 'chat1', to: 'bank1' },
+    { from: 'chat2', to: 'bank2' },
+  ];
+
+  const nodeMap = {};
+  nodes.forEach(n => nodeMap[n.id] = n);
+
+  return (
+    <svg viewBox="0 0 240 150" className="w-full h-full">
+      {/* Edges */}
+      {edges.map((e, i) => {
+        const from = nodeMap[e.from];
+        const to = nodeMap[e.to];
+        return (
+          <line key={i} x1={from.x} y1={from.y} x2={to.x} y2={to.y}
+                stroke="#1a2233" strokeWidth="1" className="conn-line"
+                style={{ animationDelay: `${i * 0.2}s` }}/>
+        );
+      })}
+
+      {/* Nodes */}
+      {nodes.map((n, i) => (
+        <g key={i}>
+          {n.type === 'hub' && (
+            <>
+              <circle cx={n.x} cy={n.y} r="18" fill={n.color} opacity="0.05"/>
+              <circle cx={n.x} cy={n.y} r="12" fill={n.color} opacity="0.1"/>
+            </>
+          )}
+          <circle cx={n.x} cy={n.y} r={n.type === 'hub' ? 8 : 5}
+                  fill={n.color} opacity="0.8"/>
+          <circle cx={n.x} cy={n.y} r={n.type === 'hub' ? 8 : 5}
+                  fill="none" stroke={n.color} strokeWidth="1" opacity="0.3"
+                  className={n.type === 'hub' ? 'animate-pulse-ring' : ''}/>
+          <text x={n.x} y={n.y + (n.type === 'hub' ? 18 : 14)}
+                textAnchor="middle" fill="#8892a4" fontSize="5" fontFamily="JetBrains Mono">
+            {n.label}
+          </text>
+          {n.type === 'bank' && (
+            <text x={n.x} y={n.y - 10} textAnchor="middle" fill="#8892a4" fontSize="4">
+              Cuenta
+            </text>
+          )}
+          {n.type === 'alert' && (
+            <text x={n.x} y={n.y - 10} textAnchor="middle" fill="#ef4444" fontSize="4">
+              Alerta SGT
+            </text>
+          )}
+        </g>
+      ))}
+
+      {/* Correlation label */}
+      <g transform="translate(120, 140)">
+        <text textAnchor="middle" fill="#22d3ee" fontSize="5" fontFamily="JetBrains Mono">
+          Score Vinculacion: 0.94
+        </text>
+      </g>
+    </svg>
+  );
+}
+
+function DashboardSection() {
+  const ref = useReveal();
+  const [activeAlerts] = useState(47);
+  const [investigations] = useState(12);
+  const [resolved] = useState(8);
+
+  return (
+    <section id="dashboard" className="relative py-28 px-6">
+      <div className="max-w-7xl mx-auto">
+        <div ref={ref} className="reveal text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-electric/20 bg-electric/5 text-[11px] font-mono text-electric tracking-wider mb-4">
+            LIVE INTELLIGENCE PREVIEW
+          </div>
+          <h2 className="text-4xl sm:text-5xl font-bold text-white mb-4">
+            Dashboard de <span className="text-electric">Inteligencia</span>
+          </h2>
+          <p className="text-ash max-w-2xl mx-auto">
+            Visualizacion en tiempo real de alertas, patrones geograficos y redes de
+            vinculacion financiera generadas por el motor de correlacion.
+          </p>
+        </div>
+
+        {/* Stats bar */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {[
+            { label: 'Alertas Activas',    value: activeAlerts,   color: 'text-neon-red',  bg: 'bg-neon-red/5  border-neon-red/20' },
+            { label: 'Investigaciones',    value: investigations, color: 'text-ember',     bg: 'bg-ember/5     border-ember/20' },
+            { label: 'Casos Resueltos',    value: resolved,       color: 'text-emerald-400', bg: 'bg-emerald-400/5 border-emerald-400/20' },
+            { label: 'Bancos Conectados',  value: 3,              color: 'text-electric',  bg: 'bg-electric/5  border-electric/20' },
+          ].map((s, i) => {
+            const sRef = useReveal();
+            return (
+              <div key={i} ref={sRef}
+                className={`reveal ${s.bg} border rounded-xl p-4 text-center`}
+                style={{ transitionDelay: `${i * 100}ms` }}>
+                <div className={`text-3xl font-bold ${s.color}`}>{s.value}</div>
+                <div className="text-xs text-ash mt-1">{s.label}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Dashboard panels */}
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Heatmap */}
+          <div className="bg-obsidian/80 border border-gunmetal/60 rounded-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gunmetal/40">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-neon-red animate-pulse"></div>
+                <span className="font-mono text-sm text-white">Mapa de Calor — Costa Rica</span>
+              </div>
+              <span className="font-mono text-[10px] text-ash/50">LIVE</span>
+            </div>
+            <div className="p-6">
+              <CostaRicaHeatmap />
+            </div>
+          </div>
+
+          {/* Network graph */}
+          <div className="bg-obsidian/80 border border-gunmetal/60 rounded-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gunmetal/40">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-cyan animate-pulse"></div>
+                <span className="font-mono text-sm text-white">Red de Grafos — Correlacion</span>
+              </div>
+              <span className="font-mono text-[10px] text-ash/50">GEMINI 2.5 PRO</span>
+            </div>
+            <div className="p-6">
+              <NetworkGraph />
+            </div>
+          </div>
+        </div>
+
+        {/* Alert feed */}
+        <div className="mt-6 bg-obsidian/80 border border-gunmetal/60 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-3 border-b border-gunmetal/40">
+            <span className="font-mono text-sm text-white">Feed de Alertas en Tiempo Real</span>
+            <span className="font-mono text-[10px] text-emerald-400">STREAMING</span>
+          </div>
+          <div className="divide-y divide-gunmetal/30">
+            {[
+              { time: '14:32:07', type: 'SGT_ALERT',    msg: 'Patron de grooming detectado — Chat buffer cifrado entregado',          level: 'CRITICAL', color: 'text-neon-red' },
+              { time: '14:31:45', type: 'BANK_CORR',    msg: 'BKA-4521 → BKB-7733: Transferencia ₡2.8M correlacionada con alerta #0042', level: 'HIGH',     color: 'text-ember' },
+              { time: '14:30:12', type: 'RESCUE_MODE',  msg: 'Modo Rescate activado — PIN de coaccion + link malicioso detectado',     level: 'CRITICAL', color: 'text-neon-red' },
+              { time: '14:28:55', type: 'GEMINI',       msg: 'Caso FL-20260419-00847 resuelto — Score vinculacion: 0.94',              level: 'RESOLVED', color: 'text-emerald-400' },
+            ].map((a, i) => (
+              <div key={i} className="flex items-center gap-4 px-6 py-3 hover:bg-gunmetal/10 transition-colors">
+                <span className="font-mono text-[11px] text-ash/50 w-16 flex-shrink-0">{a.time}</span>
+                <span className={`font-mono text-[10px] px-2 py-0.5 rounded border ${
+                  a.level === 'CRITICAL' ? 'border-neon-red/30 bg-neon-red/5 text-neon-red' :
+                  a.level === 'HIGH'     ? 'border-ember/30 bg-ember/5 text-ember' :
+                  'border-emerald-400/30 bg-emerald-400/5 text-emerald-400'
+                } w-20 text-center flex-shrink-0`}>{a.level}</span>
+                <span className="font-mono text-[11px] text-electric/70 w-24 flex-shrink-0">{a.type}</span>
+                <span className="text-sm text-ash/80 truncate">{a.msg}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   DOSSIER SECTION
+   ═══════════════════════════════════════════ */
+function DossierSection() {
+  const ref = useReveal();
+
+  return (
+    <section id="dossier" className="relative py-28 px-6 bg-abyss/50">
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gunmetal to-transparent"></div>
+
+      <div className="max-w-7xl mx-auto">
+        <div ref={ref} className="reveal text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-cyan/20 bg-cyan/5 text-[11px] font-mono text-cyan tracking-wider mb-4">
+            JUDICIAL OUTPUT
+          </div>
+          <h2 className="text-4xl sm:text-5xl font-bold text-white mb-4">
+            Expediente Digital <span className="text-cyan">para el OIJ</span>
+          </h2>
+          <p className="text-ash max-w-2xl mx-auto">
+            El sistema genera automaticamente un Dossier de Evidencia con validez probatoria,
+            listo para ser entregado a las autoridades de investigacion judicial.
+          </p>
+        </div>
+
+        <div className="grid lg:grid-cols-2 gap-8 items-start">
+          {/* PDF Preview */}
+          <div className="relative">
+            <div className="bg-obsidian/90 border border-gunmetal/60 rounded-2xl overflow-hidden glow-blue">
+              {/* PDF header bar */}
+              <div className="flex items-center gap-3 px-6 py-3 bg-abyss/80 border-b border-gunmetal/40">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                  <path d="M14 2v6h6"/>
+                </svg>
+                <span className="font-mono text-sm text-white">FL-20260419-00847_evidencia.pdf</span>
+                <span className="ml-auto font-mono text-[10px] text-ash/50">24 paginas</span>
+              </div>
+
+              {/* Simulated PDF content */}
+              <div className="p-8 space-y-6 font-mono text-xs">
+                {/* Page header */}
+                <div className="border-b border-gunmetal/40 pb-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <div className="text-electric text-base font-bold">EXPEDIENTE DE INTELIGENCIA</div>
+                      <div className="text-ash/50 mt-1">Organismo de Investigacion Judicial — Costa Rica</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-white">Caso FL-20260419-00847</div>
+                      <div className="text-ash/50">Generado: 2026-04-19 14:32 UTC</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-4 mt-3">
+                    <span className="px-2 py-1 bg-neon-red/10 border border-neon-red/20 text-neon-red rounded text-[10px]">PRIORIDAD: CRITICA</span>
+                    <span className="px-2 py-1 bg-electric/10 border border-electric/20 text-electric rounded text-[10px]">CATEGORIA: TRATA DE PERSONAS</span>
+                  </div>
+                </div>
+
+                {/* Sections */}
+                <div>
+                  <div className="text-white font-bold mb-2 text-sm">1. RESUMEN EJECUTIVO</div>
+                  <div className="text-ash/70 leading-relaxed">
+                    El motor de correlacion Gemini 2.5 Pro identifico un patron de alta probabilidad
+                    (score: 0.94) que vincula actividad de reclutamiento en chats con movimientos
+                    financieros atipicos en tres instituciones bancarias. Se detectaron 12 buffers
+                    de texto cifrados con indicadores de grooming y 8 transacciones de posible
+                    legitimacion de capitales por un monto total de ₡14.2M.
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-white font-bold mb-2 text-sm">2. EVIDENCIA DE CHATS (SGT)</div>
+                  <div className="bg-abyss/60 rounded-lg p-3 border border-gunmetal/30 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-neon-red">!</span>
+                      <span className="text-ash/60">Buffer #0042 — </span>
+                      <span className="text-neon-red">grooming_detected (p=0.91)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-neon-red">!</span>
+                      <span className="text-ash/60">Buffer #0089 — </span>
+                      <span className="text-ember">sextorsion_pattern (p=0.78)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-emerald-400">✓</span>
+                      <span className="text-ash/60">Hash inmutable: </span>
+                      <span className="text-electric">a3f8c2...e91d</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-white font-bold mb-2 text-sm">3. TRANSACCIONES VINCULADAS</div>
+                  <div className="bg-abyss/60 rounded-lg p-3 border border-gunmetal/30">
+                    <div className="grid grid-cols-4 gap-2 text-[10px] text-ash/50 mb-2 pb-2 border-b border-gunmetal/20">
+                      <span>ORIGEN</span><span>DESTINO</span><span>MONTO</span><span>RIESGO</span>
+                    </div>
+                    {[
+                      { from: 'BKA-4521', to: 'BKB-7733', amount: '₡2,800,000', risk: 'ALTO' },
+                      { from: 'BKB-7733', to: 'BKC-1290', amount: '₡1,950,000', risk: 'CRITICO' },
+                      { from: 'BKC-1290', to: 'BKA-8812', amount: '₡3,200,000', risk: 'ALTO' },
+                    ].map((t, i) => (
+                      <div key={i} className="grid grid-cols-4 gap-2 text-[11px] py-1">
+                        <span className="text-electric">{t.from}</span>
+                        <span className="text-electric">{t.to}</span>
+                        <span className="text-white">{t.amount}</span>
+                        <span className={t.risk === 'CRITICO' ? 'text-neon-red' : 'text-ember'}>{t.risk}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-2 border-t border-gunmetal/30">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" strokeWidth="2">
+                    <path d="M12 2L3 7v6c0 5.25 3.83 10.14 9 11.25C17.17 23.14 21 18.25 21 13V7l-9-5z"/>
+                  </svg>
+                  <span className="text-cyan text-[10px]">Documento firmado digitalmente — Cadena de custodia verificada</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Dossier contents */}
+          <div className="space-y-6">
+            <div className="text-sm text-ash mb-6">
+              El Dossier de Evidencia se genera automaticamente cuando el motor Gemini 2.5 Pro
+              completa la correlacion de un caso. Incluye toda la informacion necesaria para
+              iniciar una investigacion formal.
+            </div>
+
+            {[
+              {
+                num: '01',
+                title: 'Alertas SGT Cifradas',
+                desc: 'Buffers de texto clasificados por el Edge AI, transmitidos via SGT y descifrados en la Intranet. Cada alerta incluye hash de inmutabilidad.',
+                icon: '🔐',
+              },
+              {
+                num: '02',
+                title: 'Correlacion Financiera',
+                desc: 'Transacciones interbancarias vinculadas al caso. Deteccion de patrones de legitimacion de capitales con montos, frecuencias y cuentas involucradas.',
+                icon: '💰',
+              },
+              {
+                num: '03',
+                title: 'Infraestructura Maliciosa',
+                desc: 'Links de phishing/reclutamiento detectados con scoring DGA (Domain Generation Algorithm) y verificacion contra blacklists.',
+                icon: '🌐',
+              },
+              {
+                num: '04',
+                title: 'Geolocalizacion',
+                desc: 'Clusters geograficos con radio de 5km derivados de las coordenadas GPS de las alertas. Visualizados en mapa de calor.',
+                icon: '📍',
+              },
+              {
+                num: '05',
+                title: 'Hallazgos de IA',
+                desc: 'Analisis de correlacion generado por Gemini 2.5 Pro con score de vinculacion, linea temporal y recomendaciones de investigacion.',
+                icon: '🧠',
+              },
+            ].map((item, i) => {
+              const itemRef = useReveal();
+              return (
+                <div key={i} ref={itemRef}
+                  className="reveal flex gap-4 p-4 bg-obsidian/60 border border-gunmetal/40 rounded-xl hover:border-cyan/20 transition-colors"
+                  style={{ transitionDelay: `${i * 100}ms` }}>
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-cyan/5 border border-cyan/10 flex items-center justify-center text-lg">
+                    {item.icon}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono text-[10px] text-cyan/60">{item.num}</span>
+                      <span className="text-sm font-semibold text-white">{item.title}</span>
+                    </div>
+                    <p className="text-xs text-ash/70 leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   TECH STACK BANNER
+   ═══════════════════════════════════════════ */
+function TechStack() {
+  const ref = useReveal();
+  const techs = [
+    'Flutter', 'TensorFlow Lite', 'AES-256-GCM', 'RSA-OAEP',
+    'FastAPI', 'PostgreSQL', 'Gemini 2.5 Pro', 'React', 'Tailwind CSS',
+    'Docker', 'SGT Protocol', 'SHA-256',
+  ];
+  return (
+    <div ref={ref} className="reveal py-12 border-y border-gunmetal/30 bg-abyss/30">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {techs.map((t, i) => (
+            <span key={i} className="px-4 py-2 rounded-full border border-gunmetal/40 bg-obsidian/40 text-xs font-mono text-ash/60 hover:text-electric hover:border-electric/30 transition-colors">
+              {t}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════ */
+function Footer() {
+  return (
+    <footer className="py-16 px-6 border-t border-gunmetal/30">
+      <div className="max-w-7xl mx-auto text-center">
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-electric to-cyan flex items-center justify-center">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+              <path d="M12 2L3 7v6c0 5.25 3.83 10.14 9 11.25C17.17 23.14 21 18.25 21 13V7l-9-5z"/>
+              <path d="M9 12l2 2 4-4"/>
+            </svg>
+          </div>
+          <span className="text-xl font-bold">
+            <span className="text-white">Sentinel</span>
+            <span className="text-electric">-Link</span>
+          </span>
+        </div>
+        <p className="text-ash/60 text-sm mb-2">
+          Inteligencia 360° contra la Trata de Personas
+        </p>
+        <p className="text-ash/40 text-xs font-mono">
+          Hackathon Costa Rica 2026 — Tecnologia al servicio de los derechos humanos
+        </p>
+        <div className="mt-8 pt-6 border-t border-gunmetal/20 text-ash/30 text-xs font-mono">
+          Sentinel-Link &copy; 2026. Construido con proposito.
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   APP
+   ═══════════════════════════════════════════ */
+function App() {
+  return (
+    <div className="min-h-screen bg-void">
+      <Navbar />
+      <HeroSection />
+      <EcosystemSection />
+      <SecuritySection />
+      <DashboardSection />
+      <DossierSection />
+      <TechStack />
+      <Footer />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
