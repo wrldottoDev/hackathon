@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tensorflow_keyboard/keyboard/context/telemetry_entry.dart';
+import 'package:tensorflow_keyboard/keyboard/ml/risk_assessment.dart';
 import 'package:tensorflow_keyboard/keyboard/ml/text_classifier.dart';
 import 'package:tensorflow_keyboard/keyboard/ml/text_preprocessor.dart';
 
@@ -42,6 +43,7 @@ void main() {
 
     expect(result.shouldTriggerAlert, isTrue);
     expect(result.riskProbability, 0.91);
+    expect(result.category, RiskCategory.fraudeFinanciero);
   });
 
   test('classifier stays quiet when backend score is below threshold', () async {
@@ -62,6 +64,7 @@ void main() {
 
     expect(result.shouldTriggerAlert, isFalse);
     expect(result.riskProbability, 0.24);
+    expect(result.category, RiskCategory.riesgoGenerico);
   });
 }
 

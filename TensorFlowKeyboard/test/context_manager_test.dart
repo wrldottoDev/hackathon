@@ -33,8 +33,10 @@ void main() {
     expect(manager.entries.last.payload, 'mensaje-5');
   });
 
-  test('suspends and purges when current conversation matches whitelist', () {
-    final whitelist = WhitelistService()..addContact('Alice');
+  test('suspends and purges when current conversation matches whitelist',
+      () async {
+    final whitelist = WhitelistService();
+    await whitelist.addContact('Alice');
     final manager = ContextManager(whitelist: whitelist, capacity: 20);
 
     manager.handleNativeSignal(

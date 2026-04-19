@@ -1,9 +1,28 @@
 import 'package:flutter/material.dart';
 
+import '../app/screens/app_bootstrap_screen.dart';
 import 'keyboard_screen.dart';
 
+enum KeyboardAppMode {
+  application,
+  keyboard,
+}
+
 class KeyboardApp extends StatelessWidget {
-  const KeyboardApp({super.key});
+  const KeyboardApp({
+    super.key,
+    this.mode = KeyboardAppMode.keyboard,
+  });
+
+  const KeyboardApp.application({
+    super.key,
+  }) : mode = KeyboardAppMode.application;
+
+  const KeyboardApp.keyboard({
+    super.key,
+  }) : mode = KeyboardAppMode.keyboard;
+
+  final KeyboardAppMode mode;
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +39,9 @@ class KeyboardApp extends StatelessWidget {
         colorScheme: scheme,
         scaffoldBackgroundColor: const Color(0xFFF3F0E8),
       ),
-      home: const KeyboardScreen(),
+      home: mode == KeyboardAppMode.application
+          ? const AppBootstrapScreen()
+          : const KeyboardScreen(),
     );
   }
 }

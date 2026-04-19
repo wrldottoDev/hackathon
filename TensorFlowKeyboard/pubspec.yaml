@@ -14,8 +14,10 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   flutter_contacts: ^2.0.2
+  flutter_local_notifications: ^21.0.0
   http: ^1.6.0
   pointycastle: ^4.0.0
+  shared_preferences: ^2.5.5
   speech_to_text: ^7.3.0
   tflite_flutter: ^0.12.1
 

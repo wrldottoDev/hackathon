@@ -102,6 +102,16 @@ def _apply_sqlite_migrations():
                 "ALTER TABLE observed_accounts ADD COLUMN reported BOOLEAN DEFAULT 0"
             )
 
+    if "alertas" in table_names:
+        secure_alert_columns = {
+            column["name"]
+            for column in inspector.get_columns("alertas")
+        }
+        if "latitude" not in secure_alert_columns:
+            statements.append("ALTER TABLE alertas ADD COLUMN latitude FLOAT")
+        if "longitude" not in secure_alert_columns:
+            statements.append("ALTER TABLE alertas ADD COLUMN longitude FLOAT")
+
     if not statements:
         return
 

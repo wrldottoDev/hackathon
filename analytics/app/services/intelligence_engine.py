@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -22,6 +21,8 @@ from ..settings import (
     GEMINI_MODEL,
     PII_TOKENIZATION_SALT,
 )
+from .geo_utils import normalize_alert_region, normalize_transaction_region
+from .infrastructure_service import detect_alert_link_indicators
 from .pii_tokenizer import PiiTokenizer
 
 
@@ -144,7 +145,7 @@ class IntelligenceEngine:
             alert_limit=alert_limit,
             transaction_limit=transaction_limit,
         )
-        alert_payloads = [self._serialize_alert(alert) for alert in window.alerts]
+        alert_payloads = [self._serialize_alert(db, alert) for alert in window.alerts]
         transaction_payloads = [
             self._serialize_transaction(transaction)
             for transaction in window.transactions
@@ -209,7 +210,10 @@ class IntelligenceEngine:
             "1. Coincidencias entre tokens financieros (cuentas o SINPE) mencionados en alertas y transacciones reales.\n"
             "2. Patrones muchas-a-una donde varias alertas y varias transacciones convergen hacia un mismo beneficiario financiero tokenizado.\n"
             "3. Correlacion geografica, con foco explicito en Zona Norte frente a depositos o movimientos inusuales del mismo periodo.\n"
-            "4. Si no hay evidencia suficiente, reduce el score y explica la limitacion.\n"
+            "4. Si los links observados parecen DGA, indicalo solo si la estructura del dominio y el contexto lo justifican.\n"
+            "5. Si los links coinciden con anuncios de empleo fraudulentos o con blacklist interna, indicalo explicitamente.\n"
+            "6. Si existe evidencia de modo rescate por link blacklist y geografia coincidente con activacion reciente de PIN/credenciales, marcalo.\n"
+            "7. Si no hay evidencia suficiente, reduce el score y explica la limitacion.\n"
             "Usa exclusivamente los datos entregados a continuacion.\n\n"
             f"{payload_json}"
         )
@@ -258,31 +262,33 @@ class IntelligenceEngine:
             transactions=transactions,
         )
 
-    def _serialize_alert(self, alert: SecureAlert) -> dict:
+    def _serialize_alert(self, db: Session, alert: SecureAlert) -> dict:
         buffer_items = list(alert.buffer_texto or [])
         combined_payload = "\n".join(
-            str(item.get("payload", ""))
+            _buffer_item_payload(item)
             for item in buffer_items
-            if isinstance(item, dict)
-        )
+        ).strip()
         mentioned_tokens = self._tokenizer.extract_financial_tokens(
             combined_payload,
             " ".join(str(entity) for entity in (alert.entidades_extraidas or [])),
         )
         excerpt = [
-            {
-                "source": str(item.get("source", "")),
-                "origin_app": str(item.get("origin_app", "")),
-                "payload_masked": self._tokenizer.mask_text(str(item.get("payload", ""))),
-            }
+            _serialize_buffer_excerpt(self._tokenizer, item)
             for item in buffer_items[:5]
-            if isinstance(item, dict)
         ]
+        stored_links = list(
+            (alert.metadata_reporte or {}).get("infrastructure_links", [])
+        )
+        infrastructure_links = (
+            stored_links
+            if stored_links
+            else detect_alert_link_indicators(db, alert=alert)
+        )
         return {
             "alert_id": alert.id,
             "timestamp": _to_utc(alert.timestamp).isoformat(),
             "origen_app": alert.origen_app or "desconocida",
-            "region_bucket": _normalize_alert_region(alert.ubicacion_gps),
+            "region_bucket": normalize_alert_region(alert.ubicacion_gps),
             "riesgo_probabilidad": _safe_float(alert.riesgo_probabilidad),
             "entidades_tokenizadas": [
                 self._tokenizer.mask_text(str(entity))
@@ -290,6 +296,8 @@ class IntelligenceEngine:
             ],
             "menciones_financieras": mentioned_tokens,
             "buffer_extracto": excerpt,
+            "links_infrastructure": infrastructure_links,
+            "rescue_mode": (alert.metadata_reporte or {}).get("rescue_mode", {}),
         }
 
     def _serialize_transaction(self, transaction: ObservedTransaction) -> dict:
@@ -319,7 +327,7 @@ class IntelligenceEngine:
             "source_account_token": source_token,
             "destination_account_token": destination_token,
             "beneficiary_token": beneficiary_token or destination_token,
-            "region_bucket": _normalize_transaction_region(transaction.location),
+            "region_bucket": normalize_transaction_region(transaction.location),
             "amount": float(_to_decimal(transaction.amount)),
             "currency": transaction.currency,
             "channel": transaction.channel,
@@ -373,6 +381,47 @@ class IntelligenceEngine:
             reverse=True,
         )
 
+        dga_candidates: list[dict] = []
+        blacklist_hits: list[dict] = []
+        suspicious_ad_hits: list[dict] = []
+        rescue_mode_triggers: list[dict] = []
+        for alert in alert_payloads:
+            for link in alert.get("links_infrastructure", []):
+                if link.get("probable_dga"):
+                    dga_candidates.append(
+                        {
+                            "alert_id": alert["alert_id"],
+                            "url": link.get("url"),
+                            "dga_score": link.get("dga_score", 0),
+                        }
+                    )
+                if link.get("blacklist_match"):
+                    blacklist_hits.append(
+                        {
+                            "alert_id": alert["alert_id"],
+                            "url": link.get("url"),
+                            "blacklist_id": link.get("blacklist_id"),
+                        }
+                    )
+                if link.get("suspicious_ad_match"):
+                    suspicious_ad_hits.append(
+                        {
+                            "alert_id": alert["alert_id"],
+                            "url": link.get("url"),
+                            "ad_id": link.get("suspicious_ad_id"),
+                            "ad_title": link.get("ad_title"),
+                        }
+                    )
+            rescue_state = alert.get("rescue_mode", {})
+            if rescue_state.get("triggered"):
+                rescue_mode_triggers.append(
+                    {
+                        "alert_id": alert["alert_id"],
+                        "region": rescue_state.get("region"),
+                        "links": rescue_state.get("matched_links", []),
+                    }
+                )
+
         zona_norte_alerts = sum(
             1 for alert in alert_payloads if alert.get("region_bucket") == "zona_norte"
         )
@@ -383,6 +432,10 @@ class IntelligenceEngine:
                 "zona_norte_alertas": zona_norte_alerts,
                 "zona_norte_transacciones": zona_norte_transactions,
             },
+            "links_probables_dga": dga_candidates[:25],
+            "links_blacklist_detectados": blacklist_hits[:25],
+            "coincidencias_anuncios_sospechosos": suspicious_ad_hits[:25],
+            "rescue_mode_triggers": rescue_mode_triggers[:10],
             "conteo_alertas": len(alert_payloads),
             "conteo_transacciones": len(transaction_payloads),
         }
@@ -406,6 +459,10 @@ class IntelligenceEngine:
                 "patron_muchas_a_una": analysis.patron_muchas_a_una,
                 "correlacion_geografica": analysis.correlacion_geografica,
                 "beneficiarios_prioritarios": analysis.beneficiarios_prioritarios,
+                "links_con_patron_dga": analysis.links_con_patron_dga,
+                "coincidencias_anuncios_fraudulentos": analysis.coincidencias_anuncios_fraudulentos,
+                "coincidencias_blacklist_links": analysis.coincidencias_blacklist_links,
+                "alerta_rescate": analysis.alerta_rescate,
                 "resumen_precalculado": precomputed,
             },
             alert_ids=[alert.id for alert in window.alerts],
@@ -417,45 +474,6 @@ class IntelligenceEngine:
         db.commit()
         db.refresh(case)
         return case
-
-
-def _normalize_alert_region(location_value: str | None) -> str:
-    if not location_value:
-        return "sin_datos"
-
-    value = location_value.strip()
-    coordinates = re.search(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", value)
-    if coordinates:
-        latitude = float(coordinates.group(1))
-        longitude = float(coordinates.group(2))
-        if 10.2 <= latitude <= 11.4 and -85.7 <= longitude <= -83.8:
-            return "zona_norte"
-        if 9.7 <= latitude <= 10.2 and -84.5 <= longitude <= -83.7:
-            return "valle_central"
-
-    return _normalize_transaction_region(value)
-
-
-def _normalize_transaction_region(location_value: str | None) -> str:
-    if not location_value:
-        return "sin_datos"
-
-    normalized = location_value.upper()
-    if "CROSS-BANK API" in normalized or "API" in normalized:
-        return "virtual"
-    if any(keyword in normalized for keyword in ["SAN CARLOS", "CIUDAD QUESADA", "LOS CHILES", "UPALA", "GUATUSO", "PITAL", "FORTUNA", "SARAPIQUI"]):
-        return "zona_norte"
-    if any(keyword in normalized for keyword in ["SAN JOSE", "ALAJUELA", "HEREDIA", "CARTAGO"]):
-        return "valle_central"
-    if any(keyword in normalized for keyword in ["LIMON", "POCOCI", "SIQUIRRES", "TALAMANCA"]):
-        return "caribe"
-    if any(keyword in normalized for keyword in ["PUNTARENAS", "QUEPOS", "OSA", "GOLFITO", "PARRITA"]):
-        return "pacifico"
-    if any(keyword in normalized for keyword in ["GUANACASTE", "LIBERIA", "NICOYA", "SANTA CRUZ", "CAÑAS"]):
-        return "guanacaste"
-    if any(keyword in normalized for keyword in ["PANAMA", "COLOMBIA", "NICARAGUA"]):
-        return "transfronterizo"
-    return "otra_region"
 
 
 def _safe_float(value: object) -> float:
@@ -479,3 +497,26 @@ def _to_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
+
+
+def _buffer_item_payload(item: object) -> str:
+    if isinstance(item, dict):
+        payload = item.get("payload")
+        return str(payload) if payload is not None else ""
+    if isinstance(item, str):
+        return item
+    return ""
+
+
+def _serialize_buffer_excerpt(tokenizer: PiiTokenizer, item: object) -> dict:
+    if isinstance(item, dict):
+        return {
+            "source": str(item.get("source", "")),
+            "origin_app": str(item.get("origin_app", "")),
+            "payload_masked": tokenizer.mask_text(str(item.get("payload", ""))),
+        }
+    return {
+        "source": "legacy",
+        "origin_app": "",
+        "payload_masked": tokenizer.mask_text(_buffer_item_payload(item)),
+    }

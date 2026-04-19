@@ -37,7 +37,7 @@ class SecureTransport {
   static final Uri _defaultBaseUri = Uri.parse(
     const String.fromEnvironment(
       'SECURE_ALERTS_BASE_URL',
-      defaultValue: 'http://127.0.0.1:8000',
+      defaultValue: 'http://127.0.0.1:8003',
     ),
   );
 

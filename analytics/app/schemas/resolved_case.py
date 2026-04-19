@@ -17,6 +17,10 @@ class GeminiCorrelationOutput(BaseModel):
     patron_muchas_a_una: list[str] = Field(default_factory=list)
     correlacion_geografica: str = Field(default="sin evidencia suficiente")
     beneficiarios_prioritarios: list[str] = Field(default_factory=list)
+    links_con_patron_dga: list[str] = Field(default_factory=list)
+    coincidencias_anuncios_fraudulentos: list[str] = Field(default_factory=list)
+    coincidencias_blacklist_links: list[str] = Field(default_factory=list)
+    alerta_rescate: bool = False
 
 
 class ResolvedCaseResponse(BaseModel):

@@ -49,6 +49,7 @@ class TextClassifier {
         threshold: threshold,
         tokens: const <String>[],
         modelStatus: _backend.status,
+        category: RiskCategory.idle,
       );
     }
 
@@ -63,6 +64,7 @@ class TextClassifier {
         threshold: threshold,
         tokens: const <String>[],
         modelStatus: _backend.status,
+        category: RiskCategory.idle,
       );
     }
 
@@ -76,6 +78,7 @@ class TextClassifier {
       threshold: threshold,
       tokens: prepared.tokens,
       modelStatus: _backend.status,
+      category: RiskCategory.infer(prepared.tokens),
     );
   }
 

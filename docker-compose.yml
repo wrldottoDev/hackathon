@@ -123,6 +123,8 @@ services:
         SERVICE_DIR: analytics
         PORT: 8003
     container_name: flowlens-api-analytics
+    env_file:
+      - ./analytics/.env
     ports:
       - "8003:8003"
     environment:
@@ -259,6 +261,7 @@ services:
       VITE_ANALYTICS_API_KEY: ${FLOWLENS_ANALYTICS_API_KEY}
       VITE_BANK_A_API_URL: http://127.0.0.1:8001
       VITE_BANK_B_API_URL: http://127.0.0.1:8002
+      VITE_BANK_C_API_URL: http://127.0.0.1:8004
     depends_on:
       - api_analytics
     networks:

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/capture_item.dart';
@@ -136,11 +138,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: <Widget>[
                     TextField(
                       controller: _contactController,
-                      decoration: InputDecoration(
+                          decoration: InputDecoration(
                         labelText: 'Agregar contacto de confianza',
                         suffixIcon: IconButton(
                           onPressed: () {
-                            widget.whitelist.addContact(_contactController.text);
+                            unawaited(
+                              widget.whitelist
+                                  .addContact(_contactController.text),
+                            );
                             _contactController.clear();
                           },
                           icon: const Icon(Icons.person_add_alt_1),
@@ -155,7 +160,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           .map(
                             (contact) => InputChip(
                               label: Text(contact),
-                              onDeleted: () => widget.whitelist.removeContact(contact),
+                              onDeleted: () {
+                                unawaited(
+                                  widget.whitelist.removeContact(contact),
+                                );
+                              },
                             ),
                           )
                           .toList(),

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db
 from .middleware.sgt_guard import SGTGuardMiddleware
-from .routes import accounts, alerts, banks, dashboard, external_intel, finsta, investigations, network, reports, resolved_cases, secure_alerts, transactions
+from .routes import accounts, alerts, banks, dashboard, external_intel, finsta, infrastructure, investigations, network, reports, resolved_cases, secure_alerts, transactions
 from .settings import ALLOWED_ORIGINS
 
 
@@ -44,6 +44,7 @@ app.include_router(investigations.router)
 app.include_router(dashboard.router)
 app.include_router(secure_alerts.router)
 app.include_router(resolved_cases.router)
+app.include_router(infrastructure.router)
 
 
 @app.get("/", tags=["health"])

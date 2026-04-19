@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'keyboard_controller.dart';
@@ -5,7 +7,12 @@ import 'widgets/qwerty_keyboard.dart';
 import 'widgets/security_alert_bar.dart';
 
 class KeyboardScreen extends StatefulWidget {
-  const KeyboardScreen({super.key});
+  const KeyboardScreen({
+    super.key,
+    this.controller,
+  });
+
+  final KeyboardController? controller;
 
   @override
   State<KeyboardScreen> createState() => _KeyboardScreenState();
@@ -14,15 +21,19 @@ class KeyboardScreen extends StatefulWidget {
 class _KeyboardScreenState extends State<KeyboardScreen>
     with WidgetsBindingObserver {
   late final KeyboardController _controller;
+  late final bool _ownsController;
   final TextEditingController _contactController = TextEditingController();
   final TextEditingController _conversationController = TextEditingController();
+  final TextEditingController _reportCommentController =
+      TextEditingController();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _controller = KeyboardController();
-    _controller.hydrate();
+    _controller = widget.controller ?? KeyboardController();
+    _ownsController = widget.controller == null;
+    unawaited(_controller.hydrate());
   }
 
   @override
@@ -30,7 +41,10 @@ class _KeyboardScreenState extends State<KeyboardScreen>
     WidgetsBinding.instance.removeObserver(this);
     _contactController.dispose();
     _conversationController.dispose();
-    _controller.disposeSafely();
+    _reportCommentController.dispose();
+    if (_ownsController) {
+      _controller.disposeSafely();
+    }
     super.dispose();
   }
 
@@ -44,50 +58,68 @@ class _KeyboardScreenState extends State<KeyboardScreen>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
+        if (!_controller.reportFormVisible &&
+            _reportCommentController.text.isNotEmpty) {
+          _reportCommentController.clear();
+        }
+
         return Scaffold(
           body: SafeArea(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: <Color>[
-                    Color(0xFFF6F2E9),
-                    Color(0xFFEAE3D6),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+            child: Stack(
+              children: <Widget>[
+                Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: <Color>[
+                        Color(0xFFF6F2E9),
+                        Color(0xFFEAE3D6),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                  child: ListView(
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      12,
+                      16,
+                      _controller.reportFormVisible ? 280 : 16,
+                    ),
+                    children: <Widget>[
+                      _Header(controller: _controller),
+                      const SizedBox(height: 12),
+                      SecurityAlertBar(
+                        alerts: KeyboardController.securityAlerts,
+                        secureModeEnabled: _controller.secureModeEnabled,
+                      ),
+                      if (_controller.hasRiskAlert) ...<Widget>[
+                        const SizedBox(height: 12),
+                        _RiskAlertCard(controller: _controller),
+                      ],
+                      const SizedBox(height: 12),
+                      _DraftPreview(controller: _controller),
+                      const SizedBox(height: 12),
+                      _TelemetryStateCard(controller: _controller),
+                      const SizedBox(height: 12),
+                      _TrustedContactsCard(
+                        controller: _controller,
+                        contactController: _contactController,
+                        conversationController: _conversationController,
+                      ),
+                      const SizedBox(height: 12),
+                      _SpeechCard(controller: _controller),
+                      const SizedBox(height: 12),
+                      _BufferCard(controller: _controller),
+                      const SizedBox(height: 16),
+                      QwertyKeyboard(controller: _controller),
+                    ],
+                  ),
                 ),
-              ),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                children: <Widget>[
-                  _Header(controller: _controller),
-                  const SizedBox(height: 12),
-                  SecurityAlertBar(
-                    alerts: KeyboardController.securityAlerts,
-                    secureModeEnabled: _controller.secureModeEnabled,
-                  ),
-                  if (_controller.hasRiskAlert) ...<Widget>[
-                    const SizedBox(height: 12),
-                    _RiskAlertCard(controller: _controller),
-                  ],
-                  const SizedBox(height: 12),
-                  _DraftPreview(controller: _controller),
-                  const SizedBox(height: 12),
-                  _TelemetryStateCard(controller: _controller),
-                  const SizedBox(height: 12),
-                  _TrustedContactsCard(
-                    controller: _controller,
-                    contactController: _contactController,
-                    conversationController: _conversationController,
-                  ),
-                  const SizedBox(height: 12),
-                  _SpeechCard(controller: _controller),
-                  const SizedBox(height: 12),
-                  _BufferCard(controller: _controller),
-                  const SizedBox(height: 16),
-                  QwertyKeyboard(controller: _controller),
-                ],
-              ),
+                _FloatingReportComposer(
+                  controller: _controller,
+                  reportCommentController: _reportCommentController,
+                ),
+              ],
             ),
           ),
         );
@@ -250,6 +282,10 @@ class _TelemetryStateCard extends StatelessWidget {
                 child: const Text('Accessibility'),
               ),
               FilledButton.tonal(
+                onPressed: controller.openNotificationSettings,
+                child: const Text('Notificaciones'),
+              ),
+              FilledButton.tonal(
                 onPressed: controller.refreshContextSummary,
                 child: const Text('Refrescar'),
               ),
@@ -293,7 +329,7 @@ class _RiskAlertCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            'Alerta de Riesgo',
+            assessment.notificationTitle,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
@@ -301,8 +337,13 @@ class _RiskAlertCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Probabilidad: ${assessment.riskProbability.toStringAsFixed(2)}',
+            '${assessment.categoryLabel} • Probabilidad ${assessment.riskProbability.toStringAsFixed(2)}',
             style: const TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            assessment.notificationBody,
+            style: const TextStyle(color: Colors.white70),
           ),
           if (assessment.tokens.isNotEmpty) ...<Widget>[
             const SizedBox(height: 8),
@@ -328,18 +369,26 @@ class _RiskAlertCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 12),
-          FilledButton(
-            onPressed:
-                controller.sendingAlert ? null : controller.sendRiskAlert,
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFF2D4D4),
-              foregroundColor: const Color(0xFF6A1010),
-            ),
-            child: Text(
-              controller.sendingAlert
-                  ? 'Enviando alerta...'
-                  : 'Enviar a /api/v1/alertas',
-            ),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: <Widget>[
+              FilledButton(
+                onPressed: controller.showReportForm,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFF2D4D4),
+                  foregroundColor: const Color(0xFF6A1010),
+                ),
+                child: const Text('Abrir denuncia'),
+              ),
+              FilledButton.tonal(
+                onPressed: controller.clearContextBuffer,
+                style: FilledButton.styleFrom(
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Purgar buffer'),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           Text(
@@ -385,7 +434,7 @@ class _TrustedContactsCard extends StatelessWidget {
             children: <Widget>[
               FilledButton.tonal(
                 onPressed: controller.synchronizeContacts,
-                child: const Text('Sincronizar contactos'),
+                child: const Text('Cargar agenda'),
               ),
             ],
           ),
@@ -396,7 +445,7 @@ class _TrustedContactsCard extends StatelessWidget {
             decoration: const InputDecoration(
               labelText: 'Etiqueta actual de conversación',
               helperText:
-                  'Fuente segura controlada por el usuario. Si coincide con un contacto confiable, el buffer se purga y entra en modo suspendido.',
+                  'Si coincide con un contacto confiable, el buffer se purga y entra en modo suspendido.',
             ),
           ),
           const SizedBox(height: 12),
@@ -425,6 +474,13 @@ class _TrustedContactsCard extends StatelessWidget {
                   ),
                 )
                 .toList(),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'La gestión completa de contactos de confianza vive en la app principal.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF625E57),
+                ),
           ),
         ],
       ),
@@ -500,12 +556,144 @@ class _BufferCard extends StatelessWidget {
               ),
           const SizedBox(height: 8),
           Text(
-            'Este buffer es volátil: se purga cada 5 minutos o cuando se pierde el foco.',
+            'Este buffer es volátil: se purga cada 5 minutos, por pérdida de foco o si el usuario descarta la alerta.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: const Color(0xFF625E57),
                 ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FloatingReportComposer extends StatelessWidget {
+  const _FloatingReportComposer({
+    required this.controller,
+    required this.reportCommentController,
+  });
+
+  final KeyboardController controller;
+  final TextEditingController reportCommentController;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      ignoring: !controller.reportFormVisible,
+      child: AnimatedSlide(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        offset:
+            controller.reportFormVisible ? Offset.zero : const Offset(0, 1.2),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 180),
+          opacity: controller.reportFormVisible ? 1 : 0,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Material(
+                elevation: 18,
+                borderRadius: BorderRadius.circular(28),
+                color: const Color(0xFFFEFBF6),
+                child: Container(
+                  width: 560,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: const Color(0xFFD9CCB5)),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  controller.riskAssessment.notificationTitle,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Formulario de denuncia minimalista sobre el teclado. El comentario se enviará cifrado con el paquete.',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: const Color(0xFF625E57),
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: controller.hideReportForm,
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      CheckboxListTile(
+                        value: controller.reportIntentConfirmed,
+                        onChanged: (value) => controller
+                            .setReportIntentConfirmed(value ?? false),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Check de Denuncia'),
+                        subtitle: const Text(
+                          'Confirmo que deseo preparar y enviar la denuncia cifrada.',
+                        ),
+                      ),
+                      if (controller.reportIntentConfirmed) ...<Widget>[
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: reportCommentController,
+                          minLines: 2,
+                          maxLines: 4,
+                          onChanged: controller.updateReportComment,
+                          decoration: const InputDecoration(
+                            labelText: 'Comentario rápido',
+                            hintText:
+                                'Ej. El perfil me ofreció empleo y pidió mover la conversación a otro canal.',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: <Widget>[
+                            OutlinedButton(
+                              onPressed: controller.hideReportForm,
+                              child: const Text('Cancelar'),
+                            ),
+                            const Spacer(),
+                            FilledButton(
+                              onPressed: controller.canSubmitReport
+                                  ? controller.sendRiskAlert
+                                  : null,
+                              child: Text(
+                                controller.sendingAlert
+                                    ? 'Enviando...'
+                                    : 'Enviar denuncia cifrada',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

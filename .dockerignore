@@ -11,5 +11,6 @@ hackathon
 node_modules
 dist
 .env.local
+analytics/.env
 banco1
 docs

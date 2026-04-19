@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Column, DateTime, Integer, String, Text
+from sqlalchemy import Float, JSON, Column, DateTime, Integer, String, Text
 
 from ..database import Base
 
@@ -17,6 +17,8 @@ class SecureAlert(Base):
         index=True,
     )
     ubicacion_gps = Column(String(120), nullable=False, default="sin_datos")
+    latitude = Column(Float, nullable=True, index=True)
+    longitude = Column(Float, nullable=True, index=True)
     entidades_extraidas = Column(JSON, nullable=False, default=list)
     estado_investigacion = Column(String(32), nullable=False, default="pendiente")
     metadata_reporte = Column(JSON, nullable=False, default=dict)

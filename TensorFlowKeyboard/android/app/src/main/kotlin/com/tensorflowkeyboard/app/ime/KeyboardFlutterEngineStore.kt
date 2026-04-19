@@ -1,5 +1,6 @@
 package com.tensorflowkeyboard.app.ime
 
+import io.flutter.plugins.GeneratedPluginRegistrant
 import android.content.Context
 import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterEngine
@@ -23,6 +24,7 @@ object KeyboardFlutterEngineStore {
         }
 
         return FlutterEngine(context).apply {
+            GeneratedPluginRegistrant.registerWith(this)
             dartExecutor.executeDartEntrypoint(
                 DartExecutor.DartEntrypoint(
                     loader.findAppBundlePath(),

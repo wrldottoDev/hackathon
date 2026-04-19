@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../src/services/whitelist_service.dart';
+import 'alerts/local_alert_notification_service.dart';
 import 'context/context_manager.dart';
 import 'context/native_context_bridge.dart';
 import 'context/speech_to_text_bridge.dart';
@@ -17,17 +18,37 @@ class KeyboardController extends ChangeNotifier {
   KeyboardController({
     KeyboardMethodChannel? methodChannel,
     SecureTransport? secureTransport,
+    WhitelistService? whitelistService,
+    TrustedContactsService? trustedContactsService,
+    LocalAlertNotificationService? notificationService,
   })  : _methodChannel = methodChannel ?? const KeyboardMethodChannel(),
-        _secureTransport = secureTransport ?? SecureTransport() {
+        _secureTransport = secureTransport ?? SecureTransport(),
+        _ownsSecureTransport = secureTransport == null,
+        whitelist = whitelistService ?? WhitelistService(),
+        _ownsWhitelist = whitelistService == null,
+        _notificationService =
+            notificationService ?? LocalAlertNotificationService.instance,
+        _ownsTrustedContacts = trustedContactsService == null {
+    trustedContacts = trustedContactsService ??
+        TrustedContactsService(
+          whitelist: whitelist,
+        );
     contextManager.addListener(_handleContextChanged);
     whitelist.addListener(notifyListeners);
     speechBridge.addListener(notifyListeners);
     trustedContacts.addListener(notifyListeners);
+    _notificationCommandsSubscription =
+        _notificationService.commands.listen(_handleNotificationCommand);
   }
 
   final KeyboardMethodChannel _methodChannel;
   final SecureTransport _secureTransport;
-  final WhitelistService whitelist = WhitelistService();
+  final bool _ownsSecureTransport;
+  final bool _ownsWhitelist;
+  final bool _ownsTrustedContacts;
+  final LocalAlertNotificationService _notificationService;
+  final WhitelistService whitelist;
+
   late final ContextManager contextManager = ContextManager(
     whitelist: whitelist,
   );
@@ -37,10 +58,10 @@ class KeyboardController extends ChangeNotifier {
   late final SpeechToTextBridge speechBridge = SpeechToTextBridge(
     contextManager: contextManager,
   );
-  late final TrustedContactsService trustedContacts = TrustedContactsService(
-    whitelist: whitelist,
-  );
+  late final TrustedContactsService trustedContacts;
   final TextClassifier _textClassifier = TextClassifier();
+
+  StreamSubscription<LocalAlertCommand>? _notificationCommandsSubscription;
 
   static const List<String> securityAlerts = <String>[
     'Links Sospechosos',
@@ -59,6 +80,10 @@ class KeyboardController extends ChangeNotifier {
   bool _sendingAlert = false;
   String _alertDeliveryStatus = 'Sin envíos remotos todavía.';
   SecureAlertReceipt? _lastReceipt;
+  String? _lastAlertFingerprint;
+  bool _reportFormVisible = false;
+  bool _reportIntentConfirmed = false;
+  String _reportComment = '';
 
   String get draftPreview => _draftPreview;
   bool get secureModeEnabled => _secureModeEnabled;
@@ -70,16 +95,22 @@ class KeyboardController extends ChangeNotifier {
   bool get sendingAlert => _sendingAlert;
   String get alertDeliveryStatus => _alertDeliveryStatus;
   SecureAlertReceipt? get lastReceipt => _lastReceipt;
+  bool get reportFormVisible => _reportFormVisible;
+  bool get reportIntentConfirmed => _reportIntentConfirmed;
+  String get reportComment => _reportComment;
+  bool get canSubmitReport => _reportIntentConfirmed && !_sendingAlert;
 
   Future<void> hydrate() async {
+    await whitelist.hydrate();
+
     final state = await _methodChannel.getKeyboardState();
     _hostMode = (state['hostMode'] ?? 'preview').toString();
     _nativeConnected = state['connected'] == true;
     _secureModeEnabled = state['secureMode'] == true;
 
+    await _notificationService.initialize();
     await _nativeContextBridge.start();
     _contextSummary = await _nativeContextBridge.getSummary();
-    await trustedContacts.synchronize();
     await speechBridge.initialize();
     unawaited(_textClassifier.initialize());
     notifyListeners();
@@ -128,8 +159,10 @@ class KeyboardController extends ChangeNotifier {
 
   Future<void> openInputMethodSettings() =>
       _methodChannel.openInputMethodSettings();
+
   Future<void> openAccessibilitySettings() =>
       _nativeContextBridge.openAccessibilitySettings();
+
   Future<void> openNotificationSettings() =>
       _nativeContextBridge.openNotificationSettings();
 
@@ -141,21 +174,48 @@ class KeyboardController extends ChangeNotifier {
     await speechBridge.startListening();
   }
 
-  Future<void> synchronizeContacts() => trustedContacts.synchronize();
+  Future<void> synchronizeContacts() => trustedContacts.loadContacts();
 
   void updateConversationLabel(String value) {
     contextManager.handleConversationLabel(value);
   }
 
   void addTrustedContact(String name) {
-    whitelist.addContact(name);
+    unawaited(whitelist.addContact(name));
   }
 
   void removeTrustedContact(String name) {
-    whitelist.removeContact(name);
+    unawaited(whitelist.removeContact(name));
+  }
+
+  void showReportForm() {
+    if (_reportFormVisible) {
+      return;
+    }
+    _reportFormVisible = true;
+    _reportIntentConfirmed = false;
+    notifyListeners();
+  }
+
+  void hideReportForm() {
+    _reportFormVisible = false;
+    _reportIntentConfirmed = false;
+    _reportComment = '';
+    notifyListeners();
+  }
+
+  void setReportIntentConfirmed(bool value) {
+    _reportIntentConfirmed = value;
+    notifyListeners();
+  }
+
+  void updateReportComment(String value) {
+    _reportComment = value;
+    notifyListeners();
   }
 
   void clearContextBuffer() {
+    _resetAlertUi(cancelNotification: true);
     contextManager.purge(reason: 'Limpieza manual.');
   }
 
@@ -188,6 +248,9 @@ class KeyboardController extends ChangeNotifier {
             'surveillance_enabled': contextManager.surveillanceEnabled,
             'active_app_package': contextManager.activeAppPackage,
             'model_status': _riskAssessment.modelStatus,
+            'risk_category': _riskAssessment.category.name,
+            'risk_category_label': _riskAssessment.categoryLabel,
+            'quick_comment': _reportComment.trim(),
             'client_timestamp': DateTime.now().toUtc().toIso8601String(),
           },
           extractedEntities: _riskAssessment.tokens,
@@ -198,6 +261,8 @@ class KeyboardController extends ChangeNotifier {
       _lastReceipt = receipt;
       _alertDeliveryStatus =
           'Alerta enviada. Recibo ${receipt.reciboInmutabilidad.substring(0, 12)}...';
+      _resetAlertUi(cancelNotification: true);
+      contextManager.purge(reason: 'Denuncia enviada por el usuario.');
     } on SecureTransportException catch (error) {
       _alertDeliveryStatus = error.message;
     } catch (_) {
@@ -210,11 +275,34 @@ class KeyboardController extends ChangeNotifier {
 
   void handleLifecycleChange(AppLifecycleState state) {
     contextManager.handleAppLifecycleChange(state);
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _resetAlertUi(cancelNotification: true);
+    }
   }
 
   void _handleContextChanged() {
     notifyListeners();
     _scheduleRiskAnalysis();
+  }
+
+  void _handleNotificationCommand(LocalAlertCommand command) {
+    if (command.shouldPurgeBuffer) {
+      _alertDeliveryStatus =
+          'La alerta fue descartada. El buffer local se purgó por seguridad.';
+      _resetAlertUi(cancelNotification: true);
+      contextManager.purge(
+        reason: 'Notificación descartada por el usuario.',
+      );
+      return;
+    }
+
+    if (command.shouldOpenReportForm) {
+      _alertDeliveryStatus =
+          'La notificación abrió el formulario de denuncia local.';
+      showReportForm();
+    }
   }
 
   void _scheduleRiskAnalysis() {
@@ -224,12 +312,18 @@ class KeyboardController extends ChangeNotifier {
       final entries = contextManager.entries;
 
       if (entries.isEmpty || !contextManager.surveillanceEnabled) {
+        final hadAlert = _lastAlertFingerprint != null;
         _riskAssessment = const RiskAssessment(
           riskProbability: 0,
           threshold: 0.8,
           tokens: <String>[],
           modelStatus: 'Sin riesgo activo o buffer vacío.',
+          category: RiskCategory.idle,
         );
+        if (hadAlert) {
+          _lastAlertFingerprint = null;
+          unawaited(_notificationService.cancelRiskAlert());
+        }
         notifyListeners();
         return;
       }
@@ -241,7 +335,44 @@ class KeyboardController extends ChangeNotifier {
 
       _riskAssessment = assessment;
       notifyListeners();
+      await _handleAlertTransition(assessment);
     });
+  }
+
+  Future<void> _handleAlertTransition(RiskAssessment assessment) async {
+    if (!assessment.shouldTriggerAlert) {
+      if (_lastAlertFingerprint != null) {
+        _lastAlertFingerprint = null;
+        await _notificationService.cancelRiskAlert();
+      }
+      return;
+    }
+
+    if (_lastAlertFingerprint == assessment.alertFingerprint) {
+      return;
+    }
+
+    _lastAlertFingerprint = assessment.alertFingerprint;
+    _alertDeliveryStatus =
+        '${assessment.notificationTitle} detectada localmente.';
+    notifyListeners();
+    await _notificationService.showRiskAlert(
+      assessment,
+      originApp: contextManager.activeAppPackage,
+    );
+  }
+
+  void _resetAlertUi({
+    required bool cancelNotification,
+  }) {
+    _reportFormVisible = false;
+    _reportIntentConfirmed = false;
+    _reportComment = '';
+    _lastAlertFingerprint = null;
+    if (cancelNotification) {
+      unawaited(_notificationService.cancelRiskAlert());
+    }
+    notifyListeners();
   }
 
   void disposeSafely() {
@@ -249,16 +380,23 @@ class KeyboardController extends ChangeNotifier {
     unawaited(_nativeContextBridge.dispose());
     unawaited(speechBridge.stopListening());
     _analysisDebounce?.cancel();
+    _notificationCommandsSubscription?.cancel();
     unawaited(_textClassifier.close());
-    _secureTransport.dispose();
+    if (_ownsSecureTransport) {
+      _secureTransport.dispose();
+    }
     contextManager.removeListener(_handleContextChanged);
     whitelist.removeListener(notifyListeners);
     speechBridge.removeListener(notifyListeners);
     trustedContacts.removeListener(notifyListeners);
-    trustedContacts.dispose();
-    whitelist.dispose();
+    if (_ownsWhitelist) {
+      whitelist.dispose();
+    }
     contextManager.dispose();
     speechBridge.dispose();
+    if (_ownsTrustedContacts) {
+      trustedContacts.dispose();
+    }
     dispose();
   }
 }

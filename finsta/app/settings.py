@@ -27,13 +27,13 @@ def _parse_allowed_origins() -> list[str]:
         "http://127.0.0.1:5174",
         "http://localhost:5175",
         "http://127.0.0.1:5175",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
+        "http://localhost:5177",
+        "http://127.0.0.1:5177",
     ]
 
 
 DATABASE_URL = _resolve_database_url()
 FINSTA_API_KEY = os.getenv("FLOWLENS_FINSTA_API_KEY", "flowlens-finsta-key-dev")
-ANALYTICS_API_URL = os.getenv("ANALYTICS_API_URL", "http://localhost:8004")
+ANALYTICS_API_URL = os.getenv("ANALYTICS_API_URL", "http://localhost:8003")
 ANALYTICS_API_KEY = os.getenv("FLOWLENS_ANALYTICS_API_KEY", "flowlens-analytics-key-dev")
 ALLOWED_ORIGINS = _parse_allowed_origins()

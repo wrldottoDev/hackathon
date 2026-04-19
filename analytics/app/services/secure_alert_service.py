@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from ..models.secure_alert import SecureAlert
 from ..schemas.secure_alert import DecryptedAlertReport
+from .geo_utils import parse_coordinates_from_text
+from .infrastructure_service import detect_alert_link_indicators, evaluate_rescue_mode_for_alert
 
 
 def persist_secure_alert(
@@ -26,11 +28,17 @@ def persist_secure_alert(
     if existing is not None:
         return existing
 
+    formatted_location = format_location(report.ubicacion_gps)
+    coordinates = parse_coordinates_from_text(formatted_location)
+    metadata = dict(report.metadata)
+
     alert = SecureAlert(
         hash_denuncia=hash_denuncia,
-        ubicacion_gps=format_location(report.ubicacion_gps),
+        ubicacion_gps=formatted_location,
+        latitude=coordinates[0] if coordinates else None,
+        longitude=coordinates[1] if coordinates else None,
         entidades_extraidas=list(report.entidades_extraidas),
-        metadata_reporte=dict(report.metadata),
+        metadata_reporte=metadata,
         buffer_texto=[event.model_dump(mode="json") for event in report.buffer_texto],
         origen_app=report.origen_app,
         riesgo_probabilidad=f"{report.riesgo_probabilidad:.2f}",
@@ -41,6 +49,22 @@ def persist_secure_alert(
     db.add(alert)
     db.commit()
     db.refresh(alert)
+
+    link_indicators = detect_alert_link_indicators(db, alert, increment_hits=True)
+    rescue_mode = evaluate_rescue_mode_for_alert(
+        db,
+        alert,
+        link_indicators=link_indicators,
+    )
+    if link_indicators or rescue_mode.get("triggered"):
+        alert.metadata_reporte = {
+            **dict(alert.metadata_reporte or {}),
+            "infrastructure_links": link_indicators,
+            "rescue_mode": rescue_mode,
+        }
+        db.add(alert)
+        db.commit()
+        db.refresh(alert)
     return alert
 
 
