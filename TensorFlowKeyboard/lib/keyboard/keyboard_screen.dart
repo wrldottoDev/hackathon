@@ -86,7 +86,10 @@ class _KeyboardScreenState extends State<KeyboardScreen>
                       ),
                       const SizedBox(height: 10),
                     ],
-                    QwertyKeyboard(controller: _controller),
+                    QwertyKeyboard(
+                      controller: _controller,
+                      compact: true,
+                    ),
                   ],
                 ),
               ),

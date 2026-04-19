@@ -10,7 +10,7 @@ void main() {
     expect(find.text('1'), findsOneWidget);
     expect(find.text('Q'), findsOneWidget);
 
-    expect(find.text('Mantén: Modo Seguro'), findsOneWidget);
+    expect(find.text('Seguro'), findsOneWidget);
     expect(find.text('Espacio'), findsOneWidget);
   });
 }

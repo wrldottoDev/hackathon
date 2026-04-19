@@ -1,6 +1,7 @@
 package com.tensorflowkeyboard.app.ime
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.inputmethodservice.InputMethodService
 import android.provider.Settings
 import android.view.View
@@ -49,9 +50,9 @@ class KeyboardInputMethodService : InputMethodService(), KeyboardActionDelegate 
             inputRoot = FrameLayout(this).apply {
                 layoutParams = FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    desiredKeyboardHeightPx(),
                 )
-                minimumHeight = (280 * resources.displayMetrics.density).toInt()
+                minimumHeight = desiredKeyboardHeightPx()
             }
         }
 
@@ -67,6 +68,7 @@ class KeyboardInputMethodService : InputMethodService(), KeyboardActionDelegate 
         (flutterView?.parent as? ViewGroup)?.removeView(flutterView)
         inputRoot?.removeAllViews()
         inputRoot?.addView(flutterView)
+        updateInputViewHeight()
         attachFlutterUi()
         return inputRoot!!
     }
@@ -75,7 +77,13 @@ class KeyboardInputMethodService : InputMethodService(), KeyboardActionDelegate 
 
     override fun onStartInputView(info: android.view.inputmethod.EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        updateInputViewHeight()
         attachFlutterUi()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        updateInputViewHeight()
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -141,5 +149,29 @@ class KeyboardInputMethodService : InputMethodService(), KeyboardActionDelegate 
         if (view.getAttachedFlutterEngine() != null) {
             view.detachFromFlutterEngine()
         }
+    }
+
+    private fun updateInputViewHeight() {
+        val targetHeight = desiredKeyboardHeightPx()
+        inputRoot?.layoutParams = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            targetHeight,
+        )
+        inputRoot?.minimumHeight = targetHeight
+        flutterView?.layoutParams = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+        )
+        inputRoot?.requestLayout()
+        flutterView?.requestLayout()
+    }
+
+    private fun desiredKeyboardHeightPx(): Int {
+        val density = resources.displayMetrics.density
+        val screenHeight = resources.displayMetrics.heightPixels
+        val quarterScreen = (screenHeight * 0.24f).toInt()
+        val minHeight = (150 * density).toInt()
+        val maxHeight = (240 * density).toInt()
+        return quarterScreen.coerceIn(minHeight, maxHeight)
     }
 }
