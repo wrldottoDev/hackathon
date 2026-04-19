@@ -5,8 +5,13 @@ import android.service.notification.StatusBarNotification
 
 class SafeNotificationListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
-        CaptureCoordinator.getInstance(applicationContext).noteNotificationHeartbeat(
-            sbn?.packageName,
-        )
+        val packageName = sbn?.packageName ?: return
+        if (!MonitoredMessagingApps.contains(packageName)) {
+            return
+        }
+
+        val coordinator = CaptureCoordinator.getInstance(applicationContext)
+        coordinator.noteNotificationHeartbeat(packageName)
+        coordinator.emitNotificationSignal(packageName)
     }
 }

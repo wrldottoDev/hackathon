@@ -9,14 +9,26 @@ class SafeAccessibilityService : AccessibilityService() {
             return
         }
 
+        val packageName = event.packageName?.toString() ?: return
+        val coordinator = CaptureCoordinator.getInstance(applicationContext)
+        coordinator.updateActiveApp(packageName)
+
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
-            event.eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED
+            event.eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED ||
+            event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
         ) {
-            CaptureCoordinator.getInstance(applicationContext).noteAccessibilityHeartbeat(
-                event.packageName?.toString(),
-            )
+            coordinator.noteAccessibilityHeartbeat(packageName)
         }
     }
 
     override fun onInterrupt() = Unit
+
+    private fun eventTypeLabel(eventType: Int): String {
+        return when (eventType) {
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> "TYPE_WINDOW_CONTENT_CHANGED"
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> "TYPE_WINDOW_STATE_CHANGED"
+            AccessibilityEvent.TYPE_VIEW_FOCUSED -> "TYPE_VIEW_FOCUSED"
+            else -> "UNKNOWN"
+        }
+    }
 }

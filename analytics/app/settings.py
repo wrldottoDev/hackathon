@@ -10,10 +10,14 @@ def _resolve_database_url() -> str:
     if explicit_url:
         return explicit_url
     raw_path = os.getenv("ANALYTICS_DB_PATH", "analytics/app/analytics.db")
+    return f"sqlite:///{_resolve_file_path(raw_path)}"
+
+
+def _resolve_file_path(raw_path: str) -> Path:
     path = Path(raw_path)
     if not path.is_absolute():
         path = ROOT_DIR / path
-    return f"sqlite:///{path.resolve()}"
+    return path.resolve()
 
 
 def _parse_allowed_origins() -> list[str]:
@@ -41,9 +45,47 @@ def _parse_allowed_origins() -> list[str]:
     ]
 
 
+def _parse_csv_list(env_name: str, *, default: list[str]) -> list[str]:
+    raw_value = os.getenv(env_name)
+    if not raw_value:
+        return default
+    return [value.strip() for value in raw_value.split(",") if value.strip()]
+
+
 DATABASE_URL = _resolve_database_url()
 ANALYTICS_API_KEY = os.getenv("FLOWLENS_ANALYTICS_API_KEY", "flowlens-analytics-key-dev")
 SERVICE_TOKEN = os.getenv("FLOWLENS_SERVICE_TOKEN", "flowlens-service-token-dev")
 FETCH_TIMEOUT_SECONDS = float(os.getenv("ANALYTICS_FETCH_TIMEOUT_SECONDS", "5"))
 ALLOWED_ORIGINS = _parse_allowed_origins()
-
+SECURE_ALERTS_SGT_TAG = os.getenv("SECURE_ALERTS_SGT_TAG", "CONATT-SECURE-ENTRY")
+SECURE_ALERTS_ALLOWED_IPS = _parse_csv_list(
+    "SECURE_ALERTS_ALLOWED_IPS",
+    default=["127.0.0.1", "::1", "::ffff:127.0.0.1", "10.0.2.2"],
+)
+SECURE_ALERTS_PRIVATE_KEY_PATH = _resolve_file_path(
+    os.getenv(
+        "SECURE_ALERTS_PRIVATE_KEY_PATH",
+        "analytics/app/keys/dev_alerts_private.pem",
+    )
+)
+SECURE_ALERTS_PUBLIC_KEY_PATH = _resolve_file_path(
+    os.getenv(
+        "SECURE_ALERTS_PUBLIC_KEY_PATH",
+        "analytics/app/keys/dev_alerts_public.pem",
+    )
+)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
+GEMINI_CORRELATION_WINDOW_HOURS = int(
+    os.getenv("GEMINI_CORRELATION_WINDOW_HOURS", "24")
+)
+GEMINI_CORRELATION_ALERT_LIMIT = int(
+    os.getenv("GEMINI_CORRELATION_ALERT_LIMIT", "20")
+)
+GEMINI_CORRELATION_TRANSACTION_LIMIT = int(
+    os.getenv("GEMINI_CORRELATION_TRANSACTION_LIMIT", "200")
+)
+PII_TOKENIZATION_SALT = os.getenv(
+    "PII_TOKENIZATION_SALT",
+    "flowlens-dev-tokenization-salt",
+)

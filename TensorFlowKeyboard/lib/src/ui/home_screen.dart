@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/capture_item.dart';
 import '../platform/native_capture_bridge.dart';
 import '../services/capture_coordinator.dart';
 import '../services/whitelist_service.dart';

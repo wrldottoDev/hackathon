@@ -8,9 +8,16 @@ environment:
   sdk: ">=3.3.0 <4.0.0"
 
 dependencies:
+  basic_utils: ^5.8.2
+  cryptography: ^2.9.0
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+  flutter_contacts: ^2.0.2
+  http: ^1.6.0
+  pointycastle: ^4.0.0
+  speech_to_text: ^7.3.0
+  tflite_flutter: ^0.12.1
 
 dev_dependencies:
   flutter_test:
@@ -19,3 +26,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/models/
+    - assets/security/
