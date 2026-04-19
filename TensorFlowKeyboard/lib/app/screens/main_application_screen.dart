@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import '../../keyboard/alerts/local_alert_notification_service.dart';
 import '../../keyboard/context/trusted_contacts_service.dart';
 import '../../keyboard/keyboard_controller.dart';
-import '../../keyboard/network/secure_transport.dart';
-import '../../keyboard/network/secure_transport_settings_store.dart';
 import '../../keyboard/keyboard_screen.dart';
 import '../../src/services/whitelist_service.dart';
 import '../app_preferences_store.dart';
@@ -37,7 +35,7 @@ class _MainApplicationScreenState extends State<MainApplicationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('TensorFlowKeyboard'),
+        title: const Text('Teclado Seguro Local'),
       ),
       body: IndexedStack(
         index: _selectedIndex,
@@ -108,7 +106,7 @@ class _DashboardTab extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Desde aquí aceptas el flujo de seguridad, abres la configuración del teclado y gestionas la vista previa del IME.',
+              'Desde aquí aceptas el flujo local, abres la configuración del teclado y revisas las reglas duras por palabras.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: const Color(0xFF595952),
                   ),
@@ -167,7 +165,7 @@ class _DashboardTab extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            const _SecureAlertsServerCard(),
+            const _LocalRulesCard(),
             const SizedBox(height: 16),
             _DashboardCard(
               title: 'Estado local',
@@ -198,7 +196,7 @@ class _DashboardTab extends StatelessWidget {
                   Text(trustedContacts.status),
                   const SizedBox(height: 12),
                   Text(
-                    'Si se detecta un riesgo mayor a 0.8, el teclado publica una alerta local y puede abrir un formulario de denuncia cifrada.',
+                    'Si las reglas locales detectan coincidencias suficientes, el teclado publica una alerta y permite guardar una denuncia local simulada.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: const Color(0xFF626158),
                         ),
@@ -213,7 +211,7 @@ class _DashboardTab extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   const Text(
-                    'Abre una simulación funcional del teclado para validar alertas locales, whitelist y denuncia segura.',
+                    'Abre una simulación funcional del teclado para validar alertas locales, whitelist y denuncias solo en el dispositivo.',
                   ),
                   const SizedBox(height: 12),
                   FilledButton(
@@ -238,219 +236,42 @@ class _DashboardTab extends StatelessWidget {
   }
 }
 
-class _SecureAlertsServerCard extends StatefulWidget {
-  const _SecureAlertsServerCard();
-
-  @override
-  State<_SecureAlertsServerCard> createState() =>
-      _SecureAlertsServerCardState();
-}
-
-class _SecureAlertsServerCardState extends State<_SecureAlertsServerCard> {
-  final SecureTransportSettingsStore _settingsStore =
-      SecureTransportSettingsStore.instance;
-  final TextEditingController _baseUrlController = TextEditingController();
-  final TextEditingController _sgtTagController = TextEditingController();
-
-  bool _loading = true;
-  bool _saving = false;
-  String _statusMessage = '';
-  bool _statusIsError = false;
-  SecureTransportSettings _settings = const SecureTransportSettings();
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSettings();
-  }
-
-  @override
-  void dispose() {
-    _baseUrlController.dispose();
-    _sgtTagController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadSettings() async {
-    final settings = await _settingsStore.load();
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _settings = settings;
-      _baseUrlController.text = settings.baseUrl ?? '';
-      _sgtTagController.text = settings.sgtTag ?? '';
-      _loading = false;
-    });
-  }
-
-  Future<void> _saveSettings() async {
-    setState(() {
-      _saving = true;
-      _statusMessage = '';
-      _statusIsError = false;
-    });
-
-    try {
-      final nextSettings = SecureTransportSettings(
-        baseUrl: _baseUrlController.text,
-        sgtTag: _sgtTagController.text,
-      );
-      await _settingsStore.save(nextSettings);
-      final persisted = await _settingsStore.load();
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _settings = persisted;
-        _baseUrlController.text = persisted.baseUrl ?? '';
-        _sgtTagController.text = persisted.sgtTag ?? '';
-        _statusMessage =
-            'Configuración guardada. Los próximos envíos usarán este servidor sin reinstalar la app.';
-      });
-    } on FormatException catch (error) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _statusIsError = true;
-        _statusMessage = error.message;
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _saving = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _resetSettings() async {
-    setState(() {
-      _saving = true;
-      _statusMessage = '';
-      _statusIsError = false;
-    });
-
-    await _settingsStore.clear();
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _settings = const SecureTransportSettings();
-      _baseUrlController.clear();
-      _sgtTagController.clear();
-      _statusMessage =
-          'Se restauró la configuración por defecto del servidor de denuncias.';
-      _saving = false;
-    });
-  }
+class _LocalRulesCard extends StatelessWidget {
+  const _LocalRulesCard();
 
   @override
   Widget build(BuildContext context) {
-    final effectiveBaseUrl =
-        _settings.baseUrl ?? SecureTransport.defaultBaseUri.toString();
-    final effectiveSgtTag = _settings.sgtTag ?? SecureTransport.defaultSgtTag;
-
     return _DashboardCard(
-      title: 'Servidor de denuncias',
-      child: _loading
-          ? const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: CircularProgressIndicator(),
-              ),
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Configura la VPS que recibirá `/api/v1/alertas`. Si dejas los campos vacíos, la app usa el valor compilado por defecto.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF595952),
-                      ),
+      title: 'Reglas Locales',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'La detección ahora es totalmente local y dura. No usa TensorFlow ni envía reportes fuera del teléfono.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF595952),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _baseUrlController,
-                  keyboardType: TextInputType.url,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  decoration: InputDecoration(
-                    labelText: 'Base URL del servidor',
-                    hintText: SecureTransport.defaultBaseUri.toString(),
-                    helperText:
-                        'Usa solo el dominio base, por ejemplo https://analytics.tudominio.com',
-                  ),
+          ),
+          const SizedBox(height: 12),
+          const Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              _StatusChip(label: 'Grooming', value: '15 años, secreto, foto'),
+              _StatusChip(label: 'Captación', value: 'modelo, hotel, viaje'),
+              _StatusChip(label: 'Sextorsión', value: 'si no pagas, publico'),
+              _StatusChip(label: 'Fraude', value: 'otp, banco, código'),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Las coincidencias se convierten en una alerta local y, si el usuario confirma, en una denuncia simulada con comprobante local.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF626158),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _sgtTagController,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  decoration: InputDecoration(
-                    labelText: 'X-SGT-Tag',
-                    hintText: SecureTransport.defaultSgtTag,
-                    helperText:
-                        'Opcional. Déjalo vacío si el backend usa el tag por defecto.',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: <Widget>[
-                    _StatusChip(
-                      label: 'URL activa',
-                      value: effectiveBaseUrl,
-                    ),
-                    _StatusChip(
-                      label: 'SGT activo',
-                      value: effectiveSgtTag,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: <Widget>[
-                    FilledButton(
-                      onPressed: _saving ? null : _saveSettings,
-                      child: Text(
-                        _saving ? 'Guardando...' : 'Guardar servidor',
-                      ),
-                    ),
-                    OutlinedButton(
-                      onPressed: _saving ? null : _resetSettings,
-                      child: const Text('Restaurar default'),
-                    ),
-                  ],
-                ),
-                if (_statusMessage.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 12),
-                  Text(
-                    _statusMessage,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: _statusIsError
-                              ? const Color(0xFF8D1F1F)
-                              : const Color(0xFF0F5A4F),
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Text(
-                  'Importante: la VPS debe exponer HTTPS válido y conservar la llave pública esperada por la app, o tendrás que publicar un APK con la nueva llave.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFF626158),
-                      ),
-                ),
-              ],
-            ),
+          ),
+        ],
+      ),
     );
   }
 }

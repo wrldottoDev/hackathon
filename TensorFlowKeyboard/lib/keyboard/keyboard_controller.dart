@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 
@@ -7,23 +8,38 @@ import 'alerts/local_alert_notification_service.dart';
 import 'context/context_manager.dart';
 import 'context/native_context_bridge.dart';
 import 'context/speech_to_text_bridge.dart';
+import 'context/telemetry_entry.dart';
 import 'context/trusted_contacts_service.dart';
 import 'keyboard_method_channel.dart';
 import 'ml/risk_assessment.dart';
 import 'ml/text_classifier.dart';
 import 'network/secure_alert_models.dart';
-import 'network/secure_transport.dart';
+
+class LocalReportPreview {
+  const LocalReportPreview({
+    required this.createdAt,
+    required this.originApp,
+    required this.eventCount,
+    required this.riskCategoryLabel,
+    required this.signals,
+    required this.comment,
+  });
+
+  final DateTime createdAt;
+  final String? originApp;
+  final int eventCount;
+  final String riskCategoryLabel;
+  final List<String> signals;
+  final String comment;
+}
 
 class KeyboardController extends ChangeNotifier {
   KeyboardController({
     KeyboardMethodChannel? methodChannel,
-    SecureTransport? secureTransport,
     WhitelistService? whitelistService,
     TrustedContactsService? trustedContactsService,
     LocalAlertNotificationService? notificationService,
   })  : _methodChannel = methodChannel ?? const KeyboardMethodChannel(),
-        _secureTransport = secureTransport ?? SecureTransport(),
-        _ownsSecureTransport = secureTransport == null,
         whitelist = whitelistService ?? WhitelistService(),
         _ownsWhitelist = whitelistService == null,
         _notificationService =
@@ -42,8 +58,6 @@ class KeyboardController extends ChangeNotifier {
   }
 
   final KeyboardMethodChannel _methodChannel;
-  final SecureTransport _secureTransport;
-  final bool _ownsSecureTransport;
   final bool _ownsWhitelist;
   final bool _ownsTrustedContacts;
   final LocalAlertNotificationService _notificationService;
@@ -64,9 +78,10 @@ class KeyboardController extends ChangeNotifier {
   StreamSubscription<LocalAlertCommand>? _notificationCommandsSubscription;
 
   static const List<String> securityAlerts = <String>[
-    'Links Sospechosos',
-    'OTP Sensible',
-    'Captura Activa',
+    'Edad + números',
+    'Ofertas laborales',
+    'Amenazas íntimas',
+    'Fraude bancario',
   ];
 
   String _draftPreview = '';
@@ -78,8 +93,9 @@ class KeyboardController extends ChangeNotifier {
   Timer? _analysisDebounce;
   int _analysisGeneration = 0;
   bool _sendingAlert = false;
-  String _alertDeliveryStatus = 'Sin envíos remotos todavía.';
+  String _alertDeliveryStatus = 'No se ha generado ninguna denuncia local.';
   SecureAlertReceipt? _lastReceipt;
+  LocalReportPreview? _lastLocalReport;
   String? _lastAlertFingerprint;
   bool _reportFormVisible = false;
   bool _reportIntentConfirmed = false;
@@ -95,6 +111,7 @@ class KeyboardController extends ChangeNotifier {
   bool get sendingAlert => _sendingAlert;
   String get alertDeliveryStatus => _alertDeliveryStatus;
   SecureAlertReceipt? get lastReceipt => _lastReceipt;
+  LocalReportPreview? get lastLocalReport => _lastLocalReport;
   bool get reportFormVisible => _reportFormVisible;
   bool get reportIntentConfirmed => _reportIntentConfirmed;
   String get reportComment => _reportComment;
@@ -226,47 +243,44 @@ class KeyboardController extends ChangeNotifier {
 
     final entries = contextManager.entries;
     if (entries.isEmpty) {
-      _alertDeliveryStatus = 'No hay eventos locales para enviar.';
+      _alertDeliveryStatus =
+          'No hay eventos locales para preparar una denuncia.';
       notifyListeners();
       return;
     }
 
     _sendingAlert = true;
-    _alertDeliveryStatus = 'Entregando alerta cifrada al servidor central...';
+    _alertDeliveryStatus = 'Preparando denuncia local simulada...';
     notifyListeners();
 
     try {
-      final receipt = await _secureTransport.sendAlert(
-        SecureAlertReport(
-          riskProbability: _riskAssessment.riskProbability,
-          bufferEntries: entries
-              .map(SecureAlertBufferEntry.fromTelemetry)
-              .toList(growable: false),
-          metadata: <String, dynamic>{
-            'host_mode': _hostMode,
-            'secure_mode': _secureModeEnabled,
-            'surveillance_enabled': contextManager.surveillanceEnabled,
-            'active_app_package': contextManager.activeAppPackage,
-            'model_status': _riskAssessment.modelStatus,
-            'risk_category': _riskAssessment.category.name,
-            'risk_category_label': _riskAssessment.categoryLabel,
-            'quick_comment': _reportComment.trim(),
-            'client_timestamp': DateTime.now().toUtc().toIso8601String(),
-          },
-          extractedEntities: _riskAssessment.tokens,
-          originApp: contextManager.activeAppPackage,
-          createdAt: DateTime.now(),
-        ),
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      final createdAt = DateTime.now();
+      final receiptMarker = _buildLocalReceiptMarker(entries, createdAt);
+
+      _lastReceipt = SecureAlertReceipt(
+        id: createdAt.microsecondsSinceEpoch,
+        hashDenuncia: receiptMarker,
+        reciboInmutabilidad: 'LOCAL-$receiptMarker',
+        timestamp: createdAt,
+        estadoInvestigacion: 'simulada_local',
       );
-      _lastReceipt = receipt;
       _alertDeliveryStatus =
-          'Alerta enviada. Recibo ${receipt.reciboInmutabilidad.substring(0, 12)}...';
+          'Denuncia local simulada. No se envió información a ningún servidor.';
+      _lastLocalReport = LocalReportPreview(
+        createdAt: createdAt,
+        originApp: contextManager.activeAppPackage,
+        eventCount: entries.length,
+        riskCategoryLabel: _riskAssessment.categoryLabel,
+        signals: List<String>.unmodifiable(
+          _riskAssessment.tokens.take(8).toList(growable: false),
+        ),
+        comment: _reportComment.trim(),
+      );
       _resetAlertUi(cancelNotification: true);
-      contextManager.purge(reason: 'Denuncia enviada por el usuario.');
-    } on SecureTransportException catch (error) {
-      _alertDeliveryStatus = error.message;
+      contextManager.purge(reason: 'Denuncia local simulada por el usuario.');
     } catch (_) {
-      _alertDeliveryStatus = 'No se pudo entregar la alerta al servidor.';
+      _alertDeliveryStatus = 'No se pudo preparar la denuncia local simulada.';
     } finally {
       _sendingAlert = false;
       notifyListeners();
@@ -315,7 +329,7 @@ class KeyboardController extends ChangeNotifier {
         final hadAlert = _lastAlertFingerprint != null;
         _riskAssessment = const RiskAssessment(
           riskProbability: 0,
-          threshold: 0.8,
+          threshold: 0.58,
           tokens: <String>[],
           modelStatus: 'Sin riesgo activo o buffer vacío.',
           category: RiskCategory.idle,
@@ -382,9 +396,6 @@ class KeyboardController extends ChangeNotifier {
     _analysisDebounce?.cancel();
     _notificationCommandsSubscription?.cancel();
     unawaited(_textClassifier.close());
-    if (_ownsSecureTransport) {
-      _secureTransport.dispose();
-    }
     contextManager.removeListener(_handleContextChanged);
     whitelist.removeListener(notifyListeners);
     speechBridge.removeListener(notifyListeners);
@@ -398,5 +409,24 @@ class KeyboardController extends ChangeNotifier {
       trustedContacts.dispose();
     }
     dispose();
+  }
+
+  String _buildLocalReceiptMarker(
+    Iterable<TelemetryEntry> entries,
+    DateTime createdAt,
+  ) {
+    final payload = <String>[
+      createdAt.toUtc().toIso8601String(),
+      _riskAssessment.category.name,
+      _riskAssessment.tokens.join('|'),
+      _reportComment.trim(),
+      ...entries.map(
+        (entry) =>
+            '${entry.source}|${entry.originApp}|${entry.payload}|${entry.timestamp.toUtc().toIso8601String()}',
+      ),
+    ].join('||');
+
+    final encoded = base64Url.encode(utf8.encode(payload)).replaceAll('=', '');
+    return encoded.length <= 24 ? encoded : encoded.substring(0, 24);
   }
 }

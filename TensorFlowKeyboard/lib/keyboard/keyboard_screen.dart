@@ -96,6 +96,10 @@ class _KeyboardScreenState extends State<KeyboardScreen>
                         const SizedBox(height: 12),
                         _RiskAlertCard(controller: _controller),
                       ],
+                      if (_controller.lastLocalReport != null) ...<Widget>[
+                        const SizedBox(height: 12),
+                        _LastLocalReportCard(controller: _controller),
+                      ],
                       const SizedBox(height: 12),
                       _DraftPreview(controller: _controller),
                       const SizedBox(height: 12),
@@ -142,7 +146,7 @@ class _Header extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                'TensorFlowKeyboard IME',
+                'Teclado Seguro Local',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -219,7 +223,7 @@ class _DraftPreview extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             controller.draftPreview.isEmpty
-                ? 'Las teclas se reflejan aquí y se envían al MethodChannel nativo.'
+                ? 'Las teclas se reflejan aquí y alimentan el buffer local de revisión.'
                 : controller.draftPreview,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
@@ -337,7 +341,7 @@ class _RiskAlertCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '${assessment.categoryLabel} • Probabilidad ${assessment.riskProbability.toStringAsFixed(2)}',
+            '${assessment.categoryLabel} • Severidad ${assessment.riskProbability.toStringAsFixed(2)}',
             style: const TextStyle(color: Colors.white),
           ),
           const SizedBox(height: 6),
@@ -379,7 +383,7 @@ class _RiskAlertCard extends StatelessWidget {
                   backgroundColor: const Color(0xFFF2D4D4),
                   foregroundColor: const Color(0xFF6A1010),
                 ),
-                child: const Text('Abrir denuncia'),
+                child: const Text('Abrir formulario'),
               ),
               FilledButton.tonal(
                 onPressed: controller.clearContextBuffer,
@@ -398,8 +402,98 @@ class _RiskAlertCard extends StatelessWidget {
           if (controller.lastReceipt != null) ...<Widget>[
             const SizedBox(height: 8),
             Text(
-              'Recibo: ${controller.lastReceipt!.reciboInmutabilidad}',
+              'Comprobante local: ${controller.lastReceipt!.reciboInmutabilidad}',
               style: const TextStyle(color: Colors.white),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _LastLocalReportCard extends StatelessWidget {
+  const _LastLocalReportCard({required this.controller});
+
+  final KeyboardController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final report = controller.lastLocalReport;
+    if (report == null) {
+      return const SizedBox.shrink();
+    }
+
+    return _SectionCard(
+      title: 'Última denuncia local',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'Se generó una simulación local. No se envió información a ningún servidor.',
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              _StatusPill(
+                label: 'Categoría',
+                value: report.riskCategoryLabel,
+              ),
+              _StatusPill(
+                label: 'Eventos',
+                value: '${report.eventCount}',
+              ),
+              _StatusPill(
+                label: 'App',
+                value: report.originApp ?? 'n/a',
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Hora: ${_formatTimestamp(report.createdAt)}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF625E57),
+                ),
+          ),
+          if (report.signals.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: report.signals
+                  .map(
+                    (signal) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEDE6DA),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(signal),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Text(
+            report.comment.isEmpty
+                ? 'Comentario: sin comentario adicional.'
+                : 'Comentario: ${report.comment}',
+          ),
+          if (controller.lastReceipt != null) ...<Widget>[
+            const SizedBox(height: 8),
+            Text(
+              'Comprobante local: ${controller.lastReceipt!.reciboInmutabilidad}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF625E57),
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
           ],
         ],
@@ -624,7 +718,7 @@ class _FloatingReportComposer extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Formulario de denuncia minimalista sobre el teclado. El comentario se enviará cifrado con el paquete.',
+                                  'Formulario local sobre el teclado. La denuncia se simula y se conserva solo dentro del dispositivo.',
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodySmall
@@ -644,13 +738,13 @@ class _FloatingReportComposer extends StatelessWidget {
                       const SizedBox(height: 12),
                       CheckboxListTile(
                         value: controller.reportIntentConfirmed,
-                        onChanged: (value) => controller
-                            .setReportIntentConfirmed(value ?? false),
+                        onChanged: (value) =>
+                            controller.setReportIntentConfirmed(value ?? false),
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                         title: const Text('Check de Denuncia'),
                         subtitle: const Text(
-                          'Confirmo que deseo preparar y enviar la denuncia cifrada.',
+                          'Confirmo que deseo preparar la denuncia solo en este dispositivo.',
                         ),
                       ),
                       if (controller.reportIntentConfirmed) ...<Widget>[
@@ -680,8 +774,8 @@ class _FloatingReportComposer extends StatelessWidget {
                                   : null,
                               child: Text(
                                 controller.sendingAlert
-                                    ? 'Enviando...'
-                                    : 'Enviar denuncia cifrada',
+                                    ? 'Guardando...'
+                                    : 'Guardar denuncia local',
                               ),
                             ),
                           ],
@@ -754,4 +848,13 @@ class _StatusPill extends StatelessWidget {
       child: Text('$label: $value'),
     );
   }
+}
+
+String _formatTimestamp(DateTime value) {
+  final local = value.toLocal();
+  final month = local.month.toString().padLeft(2, '0');
+  final day = local.day.toString().padLeft(2, '0');
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '${local.year}-$month-$day $hour:$minute';
 }

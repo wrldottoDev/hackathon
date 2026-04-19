@@ -26,34 +26,34 @@ enum RiskCategory {
   String get notificationTitle {
     switch (this) {
       case RiskCategory.grooming:
-        return 'Alerta de posible Grooming';
+        return 'Posible grooming detectado';
       case RiskCategory.trata:
-        return 'Riesgo de Trata';
+        return 'Posible captación detectada';
       case RiskCategory.sextorsion:
-        return 'Alerta de posible Sextorsión';
+        return 'Posible sextorsión detectada';
       case RiskCategory.fraudeFinanciero:
-        return 'Alerta de Fraude Financiero';
+        return 'Posible fraude financiero';
       case RiskCategory.riesgoGenerico:
-        return 'Alerta de Riesgo Digital';
+        return 'Riesgo digital local';
       case RiskCategory.idle:
-        return 'Sin riesgo activo';
+        return 'Sin hallazgos activos';
     }
   }
 
   String get notificationBody {
     switch (this) {
       case RiskCategory.grooming:
-        return 'El análisis local detectó señales compatibles con grooming.';
+        return 'Las reglas locales detectaron frases compatibles con grooming.';
       case RiskCategory.trata:
-        return 'El análisis local detectó señales compatibles con trata o captación.';
+        return 'Las reglas locales detectaron frases compatibles con captación o trata.';
       case RiskCategory.sextorsion:
-        return 'El análisis local detectó amenazas o coerción de tipo sexual.';
+        return 'Las reglas locales detectaron amenazas o coerción sexual.';
       case RiskCategory.fraudeFinanciero:
-        return 'El análisis local detectó patrones de fraude financiero o robo de credenciales.';
+        return 'Las reglas locales detectaron patrones de fraude o robo de credenciales.';
       case RiskCategory.riesgoGenerico:
-        return 'El análisis local detectó un patrón riesgoso que requiere revisión.';
+        return 'Las reglas locales detectaron un patrón riesgoso que conviene revisar.';
       case RiskCategory.idle:
-        return 'No hay riesgo activo.';
+        return 'No hay coincidencias locales relevantes.';
     }
   }
 
@@ -175,9 +175,9 @@ class RiskAssessment {
 
   static const idle = RiskAssessment(
     riskProbability: 0,
-    threshold: 0.8,
+    threshold: 0.58,
     tokens: <String>[],
-    modelStatus: 'Sin análisis todavía.',
+    modelStatus: 'Motor local por palabras listo.',
     category: RiskCategory.idle,
   );
 }

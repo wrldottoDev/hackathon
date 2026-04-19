@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tensorflow_keyboard/keyboard/context/telemetry_entry.dart';
 import 'package:tensorflow_keyboard/keyboard/ml/risk_assessment.dart';
@@ -21,72 +19,67 @@ void main() {
     );
 
     expect(result.vector.length, 256);
-    expect(result.tokens, containsAll(<String>['otp', 'urgente', 'password', 'code']));
+    expect(
+      result.tokens,
+      containsAll(<String>['otp', 'urgente', 'password', 'code']),
+    );
     expect(result.tokens, isNot(contains('the')));
   });
 
-  test('classifier triggers alert when backend score is above threshold', () async {
-    final classifier = TextClassifier(
-      backend: _FakeBackend(probability: 0.91),
-    );
+  test('classifier detects grooming from age plus secrecy phrases', () async {
+    final classifier = TextClassifier();
 
     final result = await classifier.analyzeBuffer(
       <TelemetryEntry>[
         TelemetryEntry(
           source: 'Keyboard',
           originApp: 'com.instagram.android',
-          payload: 'otp urgente password',
+          payload: 'Tengo 15 años, no le digas a nadie y mandame una foto',
           timestamp: DateTime.now(),
         ),
       ],
     );
 
     expect(result.shouldTriggerAlert, isTrue);
-    expect(result.riskProbability, 0.91);
-    expect(result.category, RiskCategory.fraudeFinanciero);
+    expect(result.category, RiskCategory.grooming);
+    expect(result.tokens, contains('15 años'));
   });
 
-  test('classifier stays quiet when backend score is below threshold', () async {
-    final classifier = TextClassifier(
-      backend: _FakeBackend(probability: 0.24),
-    );
+  test('classifier detects financial fraud from otp plus code patterns',
+      () async {
+    final classifier = TextClassifier();
 
     final result = await classifier.analyzeBuffer(
       <TelemetryEntry>[
         TelemetryEntry(
           source: 'Speech To Text',
           originApp: 'com.whatsapp',
-          payload: 'hola todo bien',
+          payload: 'Banco: verifica tu cuenta con el OTP 554433',
+          timestamp: DateTime.now(),
+        ),
+      ],
+    );
+
+    expect(result.shouldTriggerAlert, isTrue);
+    expect(result.category, RiskCategory.fraudeFinanciero);
+    expect(result.tokens, contains('código sensible + números'));
+  });
+
+  test('classifier stays idle with harmless text', () async {
+    final classifier = TextClassifier();
+
+    final result = await classifier.analyzeBuffer(
+      <TelemetryEntry>[
+        TelemetryEntry(
+          source: 'Speech To Text',
+          originApp: 'com.whatsapp',
+          payload: 'hola todo bien nos vemos luego',
           timestamp: DateTime.now(),
         ),
       ],
     );
 
     expect(result.shouldTriggerAlert, isFalse);
-    expect(result.riskProbability, 0.24);
-    expect(result.category, RiskCategory.riesgoGenerico);
+    expect(result.category, RiskCategory.idle);
   });
-}
-
-class _FakeBackend implements TextClassifierBackend {
-  _FakeBackend({required this.probability});
-
-  final double probability;
-
-  @override
-  String get status => 'fake-backend';
-
-  @override
-  Future<void> close() async {}
-
-  @override
-  Future<void> initialize() async {}
-
-  @override
-  Future<double> predict({
-    required Float32List inputVector,
-    required List<String> tokens,
-  }) async {
-    return probability;
-  }
 }

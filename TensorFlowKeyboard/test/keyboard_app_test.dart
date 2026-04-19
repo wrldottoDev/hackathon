@@ -7,8 +7,8 @@ void main() {
     await tester.pumpWidget(const KeyboardApp());
     await tester.pump();
 
-    expect(find.text('TensorFlowKeyboard IME'), findsOneWidget);
-    expect(find.text('Alertas de Seguridad'), findsOneWidget);
+    expect(find.text('Teclado Seguro Local'), findsOneWidget);
+    expect(find.text('Reglas de Alerta'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('Mantén: Modo Seguro'),

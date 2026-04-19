@@ -70,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('TensorFlowKeyboard'),
+            title: const Text('Teclado Seguro Local'),
             actions: <Widget>[
               IconButton(
                 onPressed: _refreshSummary,
@@ -91,7 +91,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: <Widget>[
                     _StatusChip(
                       label: 'IME',
-                      value: _platformSummary['imeEnabled'] == true ? 'Activo' : 'Pendiente',
+                      value: _platformSummary['imeEnabled'] == true
+                          ? 'Activo'
+                          : 'Pendiente',
                     ),
                     _StatusChip(
                       label: 'Accessibility',
@@ -138,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: <Widget>[
                     TextField(
                       controller: _contactController,
-                          decoration: InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Agregar contacto de confianza',
                         suffixIcon: IconButton(
                           onPressed: () {
@@ -227,7 +229,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               (item) => Card(
                                 margin: const EdgeInsets.only(bottom: 10),
                                 child: ListTile(
-                                  title: Text(item.senderName ?? 'Sin remitente'),
+                                  title:
+                                      Text(item.senderName ?? 'Sin remitente'),
                                   subtitle: Text(item.content),
                                   trailing: Text(item.source.label),
                                 ),

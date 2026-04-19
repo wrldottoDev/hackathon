@@ -33,7 +33,7 @@ class KeyboardApp extends StatelessWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'TensorFlowKeyboard IME',
+      title: 'Teclado Seguro Local',
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: scheme,

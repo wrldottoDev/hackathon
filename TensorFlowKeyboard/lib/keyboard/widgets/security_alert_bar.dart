@@ -26,7 +26,7 @@ class SecurityAlertBar extends StatelessWidget {
               const Icon(Icons.shield_outlined, color: Colors.white),
               const SizedBox(width: 10),
               Text(
-                'Alertas de Seguridad',
+                'Reglas de Alerta',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
@@ -35,7 +35,8 @@ class SecurityAlertBar extends StatelessWidget {
               const Spacer(),
               AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: secureModeEnabled
                       ? const Color(0xFFE36D5B)
@@ -43,7 +44,7 @@ class SecurityAlertBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  secureModeEnabled ? 'Seguro' : 'Monitoreo',
+                  secureModeEnabled ? 'Seguro' : 'Local',
                   style: const TextStyle(color: Colors.white),
                 ),
               ),

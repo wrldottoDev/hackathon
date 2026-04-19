@@ -78,7 +78,7 @@ class LocalAlertNotificationService {
             actions: <DarwinNotificationAction>[
               DarwinNotificationAction.plain(
                 _actionOpenReportForm,
-                '¿Deseas Denunciar?',
+                'Abrir formulario',
                 options: <DarwinNotificationActionOption>{
                   DarwinNotificationActionOption.foreground,
                 },
@@ -115,7 +115,7 @@ class LocalAlertNotificationService {
           _riskAlertChannelId,
           'Alertas locales de seguridad',
           description:
-              'Alertas generadas por el análisis local del teclado seguro.',
+              'Alertas generadas por reglas locales dentro del teclado seguro.',
           importance: Importance.high,
         ),
       );
@@ -146,18 +146,16 @@ class LocalAlertNotificationService {
               AndroidFlutterLocalNotificationsPlugin>();
       await androidImplementation?.requestNotificationsPermission();
 
-      final iosImplementation =
-          _plugin.resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin>();
+      final iosImplementation = _plugin.resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin>();
       await iosImplementation?.requestPermissions(
         alert: true,
         badge: false,
         sound: true,
       );
 
-      final macImplementation =
-          _plugin.resolvePlatformSpecificImplementation<
-              MacOSFlutterLocalNotificationsPlugin>();
+      final macImplementation = _plugin.resolvePlatformSpecificImplementation<
+          MacOSFlutterLocalNotificationsPlugin>();
       await macImplementation?.requestPermissions(
         alert: true,
         badge: false,
@@ -192,11 +190,11 @@ class LocalAlertNotificationService {
       _riskAlertChannelId,
       'Alertas locales de seguridad',
       channelDescription:
-          'Alertas generadas por el análisis local del teclado seguro.',
+          'Alertas generadas por reglas locales dentro del teclado seguro.',
       importance: Importance.max,
       priority: Priority.high,
       category: AndroidNotificationCategory.message,
-      ticker: 'TensorFlowKeyboard alerta local',
+      ticker: 'Teclado Seguro alerta local',
       onlyAlertOnce: true,
       ongoing: true,
       autoCancel: false,
@@ -204,7 +202,7 @@ class LocalAlertNotificationService {
       actions: <AndroidNotificationAction>[
         AndroidNotificationAction(
           _actionOpenReportForm,
-          '¿Deseas Denunciar?',
+          'Abrir formulario',
           showsUserInterface: true,
           cancelNotification: false,
         ),

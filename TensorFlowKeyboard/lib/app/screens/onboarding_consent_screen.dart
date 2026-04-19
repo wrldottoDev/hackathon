@@ -19,10 +19,8 @@ class OnboardingConsentScreen extends StatefulWidget {
 
 class _OnboardingConsentScreenState extends State<OnboardingConsentScreen> {
   late bool _termsAccepted = widget.initialState.termsAccepted;
-  late bool _accessibilityAccepted =
-      widget.initialState.accessibilityAccepted;
-  late bool _localAnalysisAccepted =
-      widget.initialState.localAnalysisAccepted;
+  late bool _accessibilityAccepted = widget.initialState.accessibilityAccepted;
+  late bool _localAnalysisAccepted = widget.initialState.localAnalysisAccepted;
 
   bool get _canContinue =>
       _termsAccepted && _accessibilityAccepted && _localAnalysisAccepted;
@@ -53,7 +51,7 @@ class _OnboardingConsentScreenState extends State<OnboardingConsentScreen> {
               ),
               const SizedBox(height: 10),
               Text(
-                'Antes de activar el teclado seguro, el usuario debe aceptar explícitamente el uso del AccessibilityService para detectar la app activa y el análisis local de riesgo sobre el texto escrito en este teclado.',
+                'Antes de activar el teclado seguro, el usuario debe aceptar explícitamente el uso del AccessibilityService para detectar la app activa y el análisis local por reglas sobre el texto escrito en este teclado.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: const Color(0xFF5B5B54),
                     ),
@@ -62,7 +60,7 @@ class _OnboardingConsentScreenState extends State<OnboardingConsentScreen> {
               const _ConsentBlock(
                 title: 'Términos y condiciones',
                 body:
-                    'La telemetría se mantiene en RAM, se purga por foco/tiempo y solo se envía una alerta cifrada si el usuario decide denunciar. No se promete recuperación forense ni monitoreo de texto externo.',
+                    'La telemetría se mantiene en RAM, se purga por foco/tiempo y la denuncia se conserva solo como simulación local si el usuario decide guardarla. No se promete recuperación forense ni monitoreo de texto externo.',
               ),
               const SizedBox(height: 14),
               const _ConsentBlock(
@@ -74,7 +72,7 @@ class _OnboardingConsentScreenState extends State<OnboardingConsentScreen> {
               const _ConsentBlock(
                 title: 'Análisis local',
                 body:
-                    'El modelo TFLite y la lógica heurística procesan solo el buffer local del teclado y el dictado voluntario. Esto puede generar falsos positivos.',
+                    'Las reglas por palabras y patrones procesan solo el buffer local del teclado y el dictado voluntario. Esto puede generar falsos positivos.',
               ),
               const SizedBox(height: 18),
               CheckboxListTile(
